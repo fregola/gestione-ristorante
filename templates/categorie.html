@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}Categorie - Gestione Ristorante{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/categorie.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-6">
+                <i class="fas fa-tags me-3"></i>Gestione Categorie
+            </h1>
+            <button class="btn btn-add-category" onclick="aggiungiCategoria()">
+                <i class="fas fa-plus me-2"></i>Nuova Categoria
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="categories-section">
+    <div class="categories-header">
+        <h3 class="mb-0">
+            <i class="fas fa-sitemap me-2"></i>Struttura Gerarchica
+        </h3>
+        <p class="text-muted mb-0 mt-2">Organizza le categorie dei prodotti con struttura genitore-figlio</p>
+    </div>
+    <div class="categories-body">
+        <div class="card">
+            <div class="card-body">
+                <div id="categories-list">
+                    <div class="text-center py-4">
+                        <div class="spinner-border text-primary" role="status">
+                            <span class="visually-hidden">Caricamento...</span>
+                        </div>
+                        <p class="mt-2 text-muted">Caricamento categorie...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Categoria -->
+<div class="modal fade" id="categoriaModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoriaModalTitle">
+                    <i class="fas fa-tag me-2"></i>Aggiungi Categoria
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoriaForm">
+                    <input type="hidden" id="categoriaId">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="categoriaNome" class="form-label">
+                                    <i class="fas fa-tag me-1"></i>Nome Categoria *
+                                </label>
+                                <input type="text" class="form-control" id="categoriaNome" required 
+                                       placeholder="es: Primi piatti, Secondi piatti...">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="categoriaParent" class="form-label">
+                            <i class="fas fa-sitemap me-1"></i>Categoria Genitore
+                        </label>
+                        <select class="form-select" id="categoriaParent">
+                            <option value="">Nessuna (Categoria principale)</option>
+                        </select>
+                        <div class="form-text">Seleziona una categoria genitore per creare una sottocategoria</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="categoriaDescrizione" class="form-label">
+                            <i class="fas fa-align-left me-1"></i>Descrizione
+                        </label>
+                        <textarea class="form-control" id="categoriaDescrizione" rows="3"
+                                  placeholder="Descrizione opzionale della categoria..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Annulla
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvaCategoria()">
+                    <i class="fas fa-save me-1"></i>Salva Categoria
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/categorie.js') }}"></script>
+{% endblock %}

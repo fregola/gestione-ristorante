@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Impostazioni - Gestione Ristorante{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/impostazioni.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-6">
+                <i class="fas fa-sliders-h me-3"></i>Impostazioni
+            </h1>
+        </div>
+    </div>
+</div>
+
+<!-- Sezione Categorie -->
+<div class="settings-section">
+    <div class="settings-header">
+        <h3 class="mb-0">
+            <i class="fas fa-tags me-2"></i>Categorie
+        </h3>
+    </div>
+    <div class="settings-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <p class="text-muted mb-0">Gestisci le categorie dei prodotti con struttura gerarchica</p>
+            <button class="btn btn-add" onclick="aggiungiCategoria()">
+                <i class="fas fa-plus me-1"></i>Aggiungi Categoria
+            </button>
+        </div>
+        <div id="categorie-list">
+            <!-- Le categorie verranno caricate qui -->
+        </div>
+    </div>
+</div>
+
+<!-- Sezione Allergeni -->
+<div class="settings-section">
+    <div class="settings-header">
+        <h3 class="mb-0">
+            <i class="fas fa-exclamation-triangle me-2"></i>Allergeni
+        </h3>
+    </div>
+    <div class="settings-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <p class="text-muted mb-0">Gestisci gli allergeni per i prodotti del menu</p>
+            <button class="btn btn-add" onclick="aggiungiAllergene()">
+                <i class="fas fa-plus me-1"></i>Aggiungi Allergene
+            </button>
+        </div>
+        <div id="allergeni-list">
+            <!-- Gli allergeni verranno caricati qui -->
+        </div>
+    </div>
+</div>
+
+<!-- Sezione Ingredienti -->
+<div class="settings-section">
+    <div class="settings-header">
+        <h3 class="mb-0">
+            <i class="fas fa-leaf me-2"></i>Ingredienti
+        </h3>
+    </div>
+    <div class="settings-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <p class="text-muted mb-0">Gestisci gli ingredienti utilizzati nei prodotti</p>
+            <button class="btn btn-add" onclick="aggiungiIngrediente()">
+                <i class="fas fa-plus me-1"></i>Aggiungi Ingrediente
+            </button>
+        </div>
+        <div id="ingredienti-list">
+            <!-- Gli ingredienti verranno caricati qui -->
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Categoria -->
+<div class="modal fade" id="categoriaModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="categoriaModalTitle">Aggiungi Categoria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="categoriaForm">
+                    <input type="hidden" id="categoriaId">
+                    <div class="mb-3">
+                        <label for="categoriaNome" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="categoriaNome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoriaParent" class="form-label">Categoria Genitore</label>
+                        <select class="form-select" id="categoriaParent">
+                            <option value="">Nessuna (Categoria principale)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoriaDescrizione" class="form-label">Descrizione</label>
+                        <textarea class="form-control" id="categoriaDescrizione" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="categoriaOrdine" class="form-label">Ordine</label>
+                        <input type="number" class="form-control" id="categoriaOrdine" value="0">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="salvaCategoria()">Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Allergene -->
+<div class="modal fade" id="allergeneModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="allergeneModalTitle">Aggiungi Allergene</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="allergeneForm">
+                    <input type="hidden" id="allergeneId">
+                    <div class="mb-3">
+                        <label for="allergeneNome" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="allergeneNome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="allergeneDescrizione" class="form-label">Descrizione</label>
+                        <textarea class="form-control" id="allergeneDescrizione" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="allergeneIcona" class="form-label">Icona (Font Awesome)</label>
+                        <input type="text" class="form-control" id="allergeneIcona" placeholder="es: fas fa-wheat-awn">
+                    </div>
+                    <div class="mb-3">
+                        <label for="allergeneColore" class="form-label">Colore</label>
+                        <input type="color" class="form-control form-control-color" id="allergeneColore" value="#ff6b6b">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="salvaAllergene()">Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Ingrediente -->
+<div class="modal fade" id="ingredienteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ingredienteModalTitle">Aggiungi Ingrediente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ingredienteForm">
+                    <input type="hidden" id="ingredienteId">
+                    <div class="mb-3">
+                        <label for="ingredienteNome" class="form-label">Nome *</label>
+                        <input type="text" class="form-control" id="ingredienteNome" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ingredienteDescrizione" class="form-label">Descrizione</label>
+                        <textarea class="form-control" id="ingredienteDescrizione" rows="3"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ingredienteCategoria" class="form-label">Categoria Ingrediente</label>
+                        <input type="text" class="form-control" id="ingredienteCategoria" placeholder="es: Verdure, Carni, Formaggi">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-primary" onclick="salvaIngrediente()">Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/impostazioni.js') }}"></script>
+{% endblock %}

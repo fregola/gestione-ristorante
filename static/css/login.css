@@ -1,0 +1,39 @@
+/* Nascondi la navbar solo per la pagina di login */
+.navbar {
+    display: none !important;
+}
+
+/* Stile specifico per il login */
+body {
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+    min-height: 100vh;
+}
+
+.login-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 0;
+}
+
+.btn-outline-light {
+    color: #6c757d;
+    border-color: #6c757d;
+}
+
+.btn-outline-light:hover {
+    background-color: #6c757d;
+    border-color: #6c757d;
+    color: white;
+}
+
+/* Stile per il pulsante di visualizzazione password */
+#togglePassword {
+    border-left: none;
+}
+
+#togglePassword:focus {
+    box-shadow: none;
+    border-color: #ced4da;
+}

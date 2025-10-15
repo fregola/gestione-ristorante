@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}Ingredienti - Gestione Ristorante{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/ingredienti.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="display-6">
+                <i class="fas fa-leaf me-3"></i>Gestione Ingredienti
+            </h1>
+            <button class="btn btn-add-ingredient" onclick="aggiungiIngrediente()">
+                <i class="fas fa-plus me-2"></i>Nuovo Ingrediente
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="ingredients-section">
+    <div class="ingredients-header">
+        <h3 class="mb-3">
+            <i class="fas fa-search me-2"></i>Ricerca e Filtri
+        </h3>
+        <div class="row">
+            <div class="col-md-12">
+                <input type="text" class="search-box" id="searchInput" 
+                       placeholder="Cerca ingredienti per nome o descrizione...">
+            </div>
+        </div>
+    </div>
+    <div class="ingredients-body">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="ingredients-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Nome</th>
+                                <th>Descrizione</th>
+                                <th width="120">Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ingredients-list">
+                            <tr>
+                                <td colspan="3" class="text-center py-4">
+                                    <div class="spinner-border text-primary" role="status">
+                                        <span class="visually-hidden">Caricamento...</span>
+                                    </div>
+                                    <p class="mt-2 text-muted">Caricamento ingredienti...</p>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per Ingrediente -->
+<div class="modal fade" id="ingredienteModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="ingredienteModalTitle">
+                    <i class="fas fa-leaf me-2"></i>Aggiungi Ingrediente
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="ingredienteForm">
+                    <input type="hidden" id="ingredienteId">
+                    <div class="row">
+                        <div class="col-md-12">
+                            <div class="mb-3">
+                                <label for="ingredienteNome" class="form-label">
+                                    <i class="fas fa-leaf me-1"></i>Nome Ingrediente *
+                                </label>
+                                <input type="text" class="form-control" id="ingredienteNome" required 
+                                       placeholder="es: Pomodoro, Mozzarella, Basilico...">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="ingredienteDescrizione" class="form-label">
+                            <i class="fas fa-align-left me-1"></i>Descrizione
+                        </label>
+                        <textarea class="form-control" id="ingredienteDescrizione" rows="3"
+                                  placeholder="Descrizione opzionale dell'ingrediente..."></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="fas fa-times me-1"></i>Annulla
+                </button>
+                <button type="button" class="btn btn-primary" onclick="salvaIngrediente()">
+                    <i class="fas fa-save me-1"></i>Salva Ingrediente
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/ingredienti.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,220 @@
+{% extends "base.html" %}
+
+{% block title %}Gestione Prodotti - Gestione Ristorante{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h2>
+                <i class="fas fa-cogs me-2"></i>Gestione Prodotti
+            </h2>
+            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#prodottoModal">
+                <i class="fas fa-plus me-1"></i>Aggiungi Prodotto
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Tabella prodotti -->
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover" id="prodotti-table">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Foto</th>
+                                <th>Nome</th>
+                                <th>Prezzo</th>
+                                <th>Categoria</th>
+                                <th>Disponibile</th>
+                                <th>Azioni</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for prodotto in prodotti %}
+                            <tr data-prodotto-id="{{ prodotto[0] }}">
+                                <td>{{ prodotto[0] }}</td>
+                                <td>
+                                    {% if prodotto[6] %}
+                                    <img src="{{ url_for('static', filename=prodotto[6]) }}" 
+                                         alt="{{ prodotto[1] }}" 
+                                         class="img-thumbnail" 
+                                         style="width: 50px; height: 50px; object-fit: cover;">
+                                    {% else %}
+                                    <div class="bg-light d-flex align-items-center justify-content-center" 
+                                         style="width: 50px; height: 50px; border-radius: 4px;">
+                                        <i class="fas fa-image text-muted"></i>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td><strong>{{ prodotto[1] }}</strong></td>
+                                <td class="text-success"><strong>€{{ "%.2f"|format(prodotto[3]) }}</strong></td>
+                                <td>
+                                    <span class="badge bg-primary">{{ prodotto[4] or 'Generale' }}</span>
+                                </td>
+                                <td>
+                                    {% if prodotto[7] %}
+                                    <span class="badge bg-success">
+                                        <i class="fas fa-check me-1"></i>Sì
+                                    </span>
+                                    {% else %}
+                                    <span class="badge bg-danger">
+                                        <i class="fas fa-times me-1"></i>No
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-warning me-1" 
+                                            data-id="{{ prodotto[0] }}" 
+                                            data-nome="{{ prodotto[1] }}" 
+                                            data-descrizione="{{ prodotto[2] or '' }}" 
+                                            data-prezzo="{{ prodotto[3] }}" 
+                                            data-categoria-id="{{ prodotto[5] or '' }}" 
+                                            data-foto="{{ prodotto[6] or '' }}"
+                                            data-disponibile="{{ 'true' if prodotto[7] else 'false' }}"
+                                            data-allergeni="{{ prodotto[8] or '' }}"
+                                            data-ingredienti="{{ prodotto[9] or '' }}"
+                                            data-allergeni-ids="{{ prodotto[10] or '' }}"
+                                            data-ingredienti-ids="{{ prodotto[11] or '' }}"
+                                            onclick="editProdottoFromData(this)">
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" 
+                                            data-id="{{ prodotto[0] }}" 
+                                            data-nome="{{ prodotto[1] }}"
+                                            onclick="deleteProdottoFromData(this)">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                {% if not prodotti %}
+                <div class="text-center py-5">
+                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
+                    <h4 class="text-muted">Nessun prodotto presente</h4>
+                    <p class="text-muted">Inizia aggiungendo il primo prodotto al menu.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal per aggiungere/modificare prodotto -->
+<div class="modal fade" id="prodottoModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">
+                    <i class="fas fa-plus me-2"></i>Aggiungi Prodotto
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="prodottoForm" enctype="multipart/form-data">
+                    <input type="hidden" id="prodottoId" value="">
+                    
+                    <div class="mb-3">
+                        <label for="nome" class="form-label">Nome Prodotto *</label>
+                        <input type="text" class="form-control" id="nome" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Allergeni</label>
+                        <div id="allergeni-container" class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
+                            <!-- Checkbox caricate dinamicamente -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Ingredienti</label>
+                        <div id="ingredienti-container" class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
+                            <!-- Checkbox caricate dinamicamente -->
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="descrizione" class="form-label">Descrizione</label>
+                        <textarea class="form-control" id="descrizione" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="prezzo" class="form-label">Prezzo (€) *</label>
+                        <input type="number" class="form-control" id="prezzo" step="0.01" min="0" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="categoria" class="form-label">Categoria *</label>
+                        <select class="form-control" id="categoria" required>
+                            <option value="">Seleziona categoria</option>
+                        </select>
+                        <div class="form-text">
+                            <small>
+                                <i class="fas fa-info-circle me-1"></i>
+                                Non trovi la categoria? <a href="{{ url_for('categorie') }}" target="_blank">Gestisci categorie</a>
+                            </small>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="foto" class="form-label">Foto Prodotto</label>
+                        <input type="file" class="form-control" id="foto" accept="image/*">
+                        <div class="form-text">
+                            <small>Formati supportati: PNG, JPG, JPEG, GIF, WEBP (max 16MB)</small>
+                        </div>
+                        <div id="foto-preview" class="mt-2" style="display: none;">
+                            <img id="foto-preview-img" src="" alt="Anteprima" class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
+                            <div class="mt-1">
+                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFotoPreview()">
+                                    <i class="fas fa-times me-1"></i>Rimuovi
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="disponibile" checked>
+                            <label class="form-check-label" for="disponibile">
+                                Prodotto disponibile
+                            </label>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" class="btn btn-success" onclick="saveProdotto()">
+                    <i class="fas fa-save me-1"></i>Salva
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast per notifiche -->
+<div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="notification-toast" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="fas fa-info-circle text-primary me-2"></i>
+            <strong class="me-auto">Notifica</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toast-message">
+            Operazione completata!
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/gestione-prodotti.js') }}"></script>
+{% endblock %}

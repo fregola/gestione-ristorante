@@ -1,0 +1,32 @@
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# File configurazione
+.env
+.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyc
+venv/
+env/
+ENV/
+
+# Upload utenti
+static/uploads/*
+!static/uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Log
+*.log
