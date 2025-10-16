@@ -18,6 +18,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST" action="{{ url_for('login') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <div class="mb-3">
                             <label for="username" class="form-label">
                                 <i class="fas fa-user me-1"></i>Username
@@ -43,23 +44,10 @@
                             </button>
                         </div>
                     </form>
-                    
-                    <hr>
-                    <div class="text-center">
-                        <small class="text-muted">
-                            <strong>Credenziali di default:</strong><br>
-                            Username: <code>admin</code><br>
-                            Password: <code>admin123</code>
-                        </small>
-                    </div>
                 </div>
             </div>
             
-            <div class="text-center mt-3">
-                <a href="{{ url_for('menu') }}" class="btn btn-outline-light">
-                    <i class="fas fa-list me-1"></i>Visualizza Menu (senza login)
-                </a>
-            </div>
+            
         </div>
     </div>
 </div>

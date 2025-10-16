@@ -1,8 +1,13 @@
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_socketio import SocketIO, emit
+from flask_wtf.csrf import CSRFProtect
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_limiter.errors import RateLimitExceeded
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
+from dotenv import load_dotenv
 import sqlite3
 import os
 from datetime import datetime
@@ -10,6 +15,15 @@ import uuid
 import time
 import requests
 import json
+
+# Import sistema di logging
+from logging_config import (
+    setup_logging, get_logger, get_security_logger, get_business_logger,
+    log_user_action, log_security_event, log_error, log_performance
+)
+
+# Carica le variabili d'ambiente dal file .env
+load_dotenv()
 
 # Variabile globale per tracciare l'ultimo aggiornamento
 ultimo_aggiornamento = int(time.time() * 1000)
@@ -19,14 +33,75 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-key-change-in-produ
 app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
+# Inizializza il sistema di logging
+log_level = os.environ.get('LOG_LEVEL', 'INFO')
+logger = setup_logging(app, log_level)
+logger.info("Applicazione ristorante avviata")
+
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Configurazione CORS - Usa variabile d'ambiente per domini consentiti
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:5001').split(',')
+socketio = SocketIO(app, cors_allowed_origins=cors_origins)
+
+# Configurazione CSRF Protection
+csrf = CSRFProtect(app)
+
+# Configurazione Rate Limiting
+limiter = Limiter(
+    app=app,
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
 
 # Configurazione Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Devi effettuare il login per accedere a questa pagina.'
+
+# Security Headers per protezione
+@app.after_request
+def add_security_headers(response):
+    """
+    Aggiunge header di sicurezza a tutte le risposte per proteggere da attacchi comuni
+    """
+    # Protezione contro clickjacking
+    response.headers['X-Frame-Options'] = 'DENY'
+    
+    # Protezione contro MIME type sniffing
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    
+    # Protezione XSS per browser legacy
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Content Security Policy per prevenire XSS e injection
+    csp = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' https://cdnjs.cloudflare.com; "
+        "connect-src 'self' ws: wss:; "
+        "frame-ancestors 'none';"
+    )
+    response.headers['Content-Security-Policy'] = csp
+    
+    # Strict Transport Security (solo se HTTPS)
+    if request.is_secure:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    
+    # Referrer Policy
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    
+    # Permissions Policy (ex Feature Policy)
+    response.headers['Permissions-Policy'] = (
+        'geolocation=(), microphone=(), camera=(), '
+        'payment=(), usb=(), magnetometer=(), gyroscope=()'
+    )
+    
+    return response
 
 # Funzione per tradurre automaticamente il testo
 def traduci_testo(testo, lingua_destinazione='en'):
@@ -341,12 +416,12 @@ def init_db():
         cursor.executemany('INSERT INTO ingredienti (nome, descrizione, categoria_ingrediente) VALUES (?, ?, ?)', 
                           ingredienti_esempio)
     
-    # Crea utente admin di default se non esiste
-    cursor.execute('SELECT * FROM utenti WHERE username = ?', ('admin',))
-    if not cursor.fetchone():
-        admin_password = generate_password_hash('admin123')
-        cursor.execute('INSERT INTO utenti (username, password_hash) VALUES (?, ?)', 
-                      ('admin', admin_password))
+    # Verifica che esista almeno un utente admin nel database
+    cursor.execute('SELECT COUNT(*) FROM utenti WHERE username = ?', ('admin',))
+    admin_count = cursor.fetchone()[0]
+    if admin_count == 0:
+        print("ATTENZIONE: Nessun utente admin trovato nel database!")
+        print("Assicurati di avere almeno un utente admin configurato.")
     
     # Inserisci alcuni prodotti di esempio se la tabella è vuota
     cursor.execute('SELECT COUNT(*) FROM prodotti')
@@ -383,10 +458,15 @@ def init_db():
 # Route per il login
 @app.route('/')
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
+        client_ip = request.remote_addr
+        
+        # Log tentativo di login
+        log_security_event("LOGIN_ATTEMPT", client_ip, f"Username: {username}")
         
         conn = sqlite3.connect('ristorante.db')
         cursor = conn.cursor()
@@ -397,8 +477,17 @@ def login():
         if user_data and check_password_hash(user_data[2], password):
             user = User(user_data[0], user_data[1], user_data[2])
             login_user(user)
+            
+            # Log login riuscito
+            log_security_event("LOGIN_SUCCESS", client_ip, f"User ID: {user.id}, Username: {username}")
+            log_user_action(user.id, "LOGIN", f"IP: {client_ip}")
+            logger.info(f"Login riuscito per utente {username} da IP {client_ip}")
+            
             return redirect(url_for('home'))
         else:
+            # Log login fallito
+            log_security_event("LOGIN_FAILED", client_ip, f"Username: {username}")
+            logger.warning(f"Tentativo login fallito per utente {username} da IP {client_ip}")
             flash('Username o password non corretti', 'error')
     
     return render_template('login.html')
@@ -473,6 +562,7 @@ def save_uploaded_file(file):
 # API per aggiungere prodotto
 @app.route('/api/menu', methods=['POST'])
 @login_required
+@limiter.limit("10 per minute")
 def aggiungi_prodotto():
     # Gestisce sia form-data (con file) che JSON
     if request.content_type and 'multipart/form-data' in request.content_type:
@@ -542,10 +632,15 @@ def aggiungi_prodotto():
     conn.commit()
     conn.close()
     
+    # Log aggiunta prodotto
+    log_user_action(current_user.id, "ADD_PRODUCT", f"Nome: {nome}, Prezzo: €{prezzo}, ID: {prodotto_id}")
+    logger.info(f"Prodotto aggiunto: {nome} (ID: {prodotto_id}) da utente {current_user.username}")
+    
     # Salva le traduzioni automaticamente per il nuovo prodotto
     try:
         salva_traduzioni('prodotti_traduzioni', prodotto_id, nome, descrizione)
     except Exception as e:
+        log_error(e, f"Errore traduzioni prodotto ID: {prodotto_id}")
         print(f"Errore nel salvare le traduzioni del prodotto: {e}")
     
     # Aggiorna timestamp per polling
@@ -698,22 +793,29 @@ def aggiorna_prodotto(prodotto_id):
     
     return jsonify({'success': True, 'foto': foto_path})
 
-# API per eliminare prodotto
 @app.route('/api/menu/<int:prodotto_id>', methods=['DELETE'])
 @login_required
 def elimina_prodotto(prodotto_id):
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     
-    # Prima di eliminare il prodotto, recupera il percorso della foto
-    cursor.execute('SELECT foto FROM prodotti WHERE id = ?', (prodotto_id,))
+    # Prima di eliminare il prodotto, recupera il nome e il percorso della foto
+    cursor.execute('SELECT nome, foto FROM prodotti WHERE id = ?', (prodotto_id,))
     result = cursor.fetchone()
-    foto_path = result[0] if result else None
+    if not result:
+        logger.warning(f"Tentativo di eliminare prodotto inesistente ID: {prodotto_id} da utente {current_user.username}")
+        return {'success': False, 'message': 'Prodotto non trovato'}, 404
+    
+    nome_prodotto, foto_path = result
     
     # Elimina il prodotto dal database
     cursor.execute('DELETE FROM prodotti WHERE id = ?', (prodotto_id,))
     conn.commit()
     conn.close()
+    
+    # Log eliminazione prodotto
+    log_user_action(current_user.id, "DELETE_PRODUCT", f"Nome: {nome_prodotto}, ID: {prodotto_id}")
+    logger.info(f"Prodotto eliminato: {nome_prodotto} (ID: {prodotto_id}) da utente {current_user.username}")
     
     # Elimina la foto dal filesystem se esiste
     if foto_path:
@@ -721,9 +823,10 @@ def elimina_prodotto(prodotto_id):
         if os.path.exists(full_foto_path):
             try:
                 os.remove(full_foto_path)
-                print(f"Foto eliminata: {full_foto_path}")
+                logger.debug(f"Foto eliminata: {full_foto_path}")
             except OSError as e:
-                print(f"Errore nell'eliminazione della foto {full_foto_path}: {e}")
+                log_error(e, f"Errore eliminazione foto: {full_foto_path}")
+                logger.error(f"Errore nell'eliminazione della foto {full_foto_path}: {e}")
     
     # Emetti aggiornamento in tempo reale
     socketio.emit('prodotto_eliminato', {'id': prodotto_id})
@@ -838,10 +941,13 @@ def update_dati_azienda():
         return jsonify({'success': True, 'message': 'Dati azienda aggiornati con successo'})
         
     except Exception as e:
+        log_error(e, "Errore aggiornamento dati azienda")
+        logger.error(f"Errore aggiornamento dati azienda da utente {current_user.username}: {str(e)}")
         return jsonify({'success': False, 'message': f'Errore durante l\'aggiornamento: {str(e)}'})
 
 @app.route('/api/upload-logo', methods=['POST'])
 @login_required
+@limiter.limit("3 per minute")
 def upload_logo():
     try:
         if 'logo' not in request.files:
@@ -1459,6 +1565,14 @@ def get_categorie_menu():
 @app.route('/logout')
 @login_required
 def logout():
+    user_id = current_user.id
+    username = current_user.username
+    client_ip = request.remote_addr
+    
+    # Log logout
+    log_user_action(user_id, "LOGOUT", f"IP: {client_ip}")
+    logger.info(f"Logout utente {username} (ID: {user_id}) da IP {client_ip}")
+    
     logout_user()
     return redirect(url_for('login'))
 
@@ -1471,6 +1585,15 @@ def handle_connect():
 def handle_disconnect():
     print('Client disconnesso')
 
+# Handler per errori di rate limiting
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit_exceeded(e):
+    client_ip = request.remote_addr
+    endpoint = request.endpoint
+    log_security_event("RATE_LIMIT_EXCEEDED", f"IP: {client_ip}, Endpoint: {endpoint}")
+    logger.warning(f"Rate limit superato da IP {client_ip} su endpoint {endpoint}")
+    return jsonify({'error': 'Troppi tentativi. Riprova più tardi.'}), 429
+
 # API per ottenere il timestamp dell'ultimo aggiornamento
 @app.route('/api/menu/last-update')
 def get_last_update():
@@ -1479,4 +1602,22 @@ def get_last_update():
 
 if __name__ == '__main__':
     init_db()
-    socketio.run(app, debug=True, host='0.0.0.0', port=5001)
+    # Debug mode solo in sviluppo, mai in produzione
+    debug_mode = os.environ.get('FLASK_DEBUG', 'False').lower() == 'true'
+    
+    # Configurazione SSL/HTTPS
+    ssl_enabled = os.environ.get('SSL_ENABLED', 'False').lower() == 'true'
+    
+    print("🚀 Avvio server Flask...")
+    print("💡 Per produzione, usa: gunicorn -c gunicorn_config.py app:app")
+    
+    if ssl_enabled:
+        # Configurazione HTTPS con certificati SSL
+        # Per SocketIO, usiamo certfile e keyfile invece di ssl_context
+        print("🔒 SSL abilitato - Server HTTPS")
+        socketio.run(app, debug=debug_mode, host='0.0.0.0', port=5001, 
+                    certfile='cert.pem', keyfile='key.pem')
+    else:
+        # Configurazione HTTP standard
+        print("🌐 Server HTTP in sviluppo")
+        socketio.run(app, debug=debug_mode, host='0.0.0.0', port=5001)

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Gestione Ristorante</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- CSS personalizzato -->
+    <link href="/static/css/style.css" rel="stylesheet">
+    
+    <!-- CSRF Token per JavaScript -->
+    <meta name="csrf-token" content="ImRiZWMyMDBhNjI2YTE1NWFhNThjNmQzZjk1NTRmMWUzMzg2ZGE5ZGQi.aO-JAA._gDwiRjztZ50_ppivWLzPh-mo14">
+    
+    
+<link rel="stylesheet" href="/static/css/login.css">
+
+</head>
+<body>
+    <div class="main-content">
+        <!-- Navbar -->
+        <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/menu">
+                <i class="fas fa-utensils me-2"></i>Gestione Ristorante
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    
+                </ul>
+                
+                <ul class="navbar-nav">
+                    
+                    <li class="nav-item">
+                        <a class="nav-link" href="/login">
+                            <i class="fas fa-sign-in-alt me-1"></i>Login
+                        </a>
+                    </li>
+                    
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenuto principale -->
+    <main class="container mt-4">
+        <!-- Flash messages -->
+        
+            
+        
+
+        
+<div class="login-container">
+    <div class="row justify-content-center w-100">
+        <div class="col-md-6 col-lg-4">
+            <div class="card shadow">
+                <div class="card-header text-white text-center">
+                    <h4 class="mb-0">
+                        <i class="fas fa-sign-in-alt me-2"></i>Accesso
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/login">
+                        ImRiZWMyMDBhNjI2YTE1NWFhNThjNmQzZjk1NTRmMWUzMzg2ZGE5ZGQi.aO-JAA._gDwiRjztZ50_ppivWLzPh-mo14
+                        <div class="mb-3">
+                            <label for="username" class="form-label">
+                                <i class="fas fa-user me-1"></i>Username
+                            </label>
+                            <input type="text" class="form-control" id="username" name="username" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="password" class="form-label">
+                                <i class="fas fa-lock me-1"></i>Password
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="password" name="password" required>
+                                <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                    <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-sign-in-alt me-1"></i>Accedi
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr>
+                    <div class="text-center">
+                        <small class="text-muted">
+                            <strong>Credenziali di default:</strong><br>
+                            Username: <code>admin</code><br>
+                            Password: <em>Configurata nel database</em>
+                        </small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center mt-3">
+                <a href="/menu" class="btn btn-outline-light">
+                    <i class="fas fa-list me-1"></i>Visualizza Menu (senza login)
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+
+<link rel="stylesheet" href="/static/css/login.css">
+
+
+    </main>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-light mt-5 py-4">
+        <div class="container text-center">
+            <p class="mb-0">&copy; 2025 Gestione Ristorante. Sviluppato da F.Creazioni</p>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+    <!-- JavaScript personalizzato -->
+    <script src="/static/js/main.js"></script>
+    
+    
+<script src="/static/js/login.js"></script>
+
+</body>
+</html>

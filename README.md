@@ -57,7 +57,7 @@ gestione-ristorante/
 ## 🔐 Credenziali di Default
 
 - **Username:** `admin`
-- **Password:** `admin123`
+- **Password:** Configurata nel database (default: `admin123`)
 
 ## 📱 Funzionalità
 

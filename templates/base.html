@@ -12,6 +12,9 @@
     <!-- CSS personalizzato -->
     <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
     
+    <!-- CSRF Token per JavaScript -->
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    
     {% block extra_css %}{% endblock %}
 </head>
 <body>

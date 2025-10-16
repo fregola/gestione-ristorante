@@ -1,7 +1,36 @@
 // JavaScript principale per Gestione Ristorante
 
+// Configurazione CSRF Token per tutte le richieste AJAX
+function setupCSRF() {
+    const token = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    
+    // Configura jQuery se disponibile
+    if (typeof $ !== 'undefined') {
+        $.ajaxSetup({
+            beforeSend: function(xhr, settings) {
+                if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type) && !this.crossDomain) {
+                    xhr.setRequestHeader("X-CSRFToken", token);
+                }
+            }
+        });
+    }
+    
+    // Configura fetch globalmente
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        if (options.method && !['GET', 'HEAD', 'OPTIONS', 'TRACE'].includes(options.method.toUpperCase())) {
+            options.headers = options.headers || {};
+            options.headers['X-CSRFToken'] = token;
+        }
+        return originalFetch(url, options);
+    };
+}
+
 // Inizializzazione quando il DOM è caricato
 document.addEventListener('DOMContentLoaded', function() {
+    // Configura CSRF per AJAX
+    setupCSRF();
+    
     // Inizializza animazioni
     initAnimations();
     
