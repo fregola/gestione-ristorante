@@ -20,7 +20,8 @@ app.config['UPLOAD_FOLDER'] = 'static/uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-socketio = SocketIO(app, cors_allowed_origins="*")
+cors_origins = os.environ.get('CORS_ORIGINS', 'http://localhost:5001,http://127.0.0.1:5001').split(',')
+socketio = SocketIO(app, cors_allowed_origins=cors_origins)
 
 # Configurazione Flask-Login
 login_manager = LoginManager()
@@ -285,6 +286,27 @@ def init_db():
         )
     ''')
 
+    # Tabella azienda per i dati dell'attività
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS azienda (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nome_attivita TEXT,
+            indirizzo TEXT,
+            email TEXT,
+            telefono TEXT,
+            partita_iva TEXT,
+            logo TEXT,
+            facebook_url TEXT,
+            instagram_url TEXT,
+            google_url TEXT,
+            sito_web TEXT,
+            descrizione TEXT,
+            orari_apertura TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+
     # Inserisci categorie di esempio se la tabella è vuota
     cursor.execute('SELECT COUNT(*) FROM categorie')
     if cursor.fetchone()[0] == 0:
@@ -342,11 +364,14 @@ def init_db():
                           ingredienti_esempio)
     
     # Crea utente admin di default se non esiste
-    cursor.execute('SELECT * FROM utenti WHERE username = ?', ('admin',))
-    if not cursor.fetchone():
-        admin_password = generate_password_hash('admin123')
+    default_admin_username = os.environ.get('DEFAULT_ADMIN_USERNAME', 'admin')
+    default_admin_password = os.environ.get('DEFAULT_ADMIN_PASSWORD')
+    
+    cursor.execute('SELECT * FROM utenti WHERE username = ?', (default_admin_username,))
+    if not cursor.fetchone() and default_admin_password:
+        admin_password = generate_password_hash(default_admin_password)
         cursor.execute('INSERT INTO utenti (username, password_hash) VALUES (?, ?)', 
-                      ('admin', admin_password))
+                      (default_admin_username, admin_password))
     
     # Inserisci alcuni prodotti di esempio se la tabella è vuota
     cursor.execute('SELECT COUNT(*) FROM prodotti')

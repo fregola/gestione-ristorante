@@ -40,24 +40,36 @@ gestione-ristorante/
 
 ## 🛠️ Installazione
 
-1. **Clona o scarica il progetto**
-2. **Installa le dipendenze:**
+1. **Clona il repository:**
+   ```bash
+   git clone https://github.com/fregola/gestione-ristorante.git
+   cd gestione-ristorante
+   ```
+
+2. **Configura le variabili d'ambiente:**
+   ```bash
+   cp .env.example .env
+   ```
+   Modifica il file `.env` con le tue credenziali (vedi `SECURITY.md` per dettagli).
+
+3. **Installa le dipendenze:**
    ```bash
    pip install -r requirements.txt
    ```
-3. **Configura Google Translate API** (opzionale per traduzioni automatiche):
-   - Ottieni una chiave API da Google Cloud Console
-   - Imposta la variabile d'ambiente `GOOGLE_TRANSLATE_API_KEY`
+
 4. **Avvia l'applicazione:**
    ```bash
    python app.py
    ```
-5. **Apri il browser** e vai su: `http://localhost:5000`
 
-## 🔐 Credenziali di Default
+5. **Accedi all'applicazione:**
+   - URL: `http://localhost:5001`
+   - **Username:** Configurato in `.env` (default: `admin`)
+   - **Password:** Configurata in `.env`
 
-- **Username:** `admin`
-- **Password:** `admin123`
+## 🔐 Configurazione Sicurezza
+
+Per motivi di sicurezza, le credenziali non sono più hardcoded. Consulta il file `SECURITY.md` per le istruzioni complete sulla configurazione delle credenziali e delle variabili d'ambiente.
 
 ## 📱 Funzionalità
 
