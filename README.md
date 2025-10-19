@@ -63,9 +63,9 @@ gestione-ristorante/
    ```
 
 5. **Accedi all'applicazione:**
-   - URL: `http://localhost:5001`
-   - **Username:** Configurato in `.env` (default: `admin`)
-   - **Password:** Configurata in `.env`
+   - URL: `http://localhost:5001` o `https://ordinalosubito.it`
+   - **Username:** `admin`
+   - **Password:** `admin123`
 
 ## 🔐 Configurazione Sicurezza
 
