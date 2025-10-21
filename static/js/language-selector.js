@@ -1,7 +1,8 @@
-// Gestione del selettore di lingua
+// Language Selector con ottimizzazioni per performance
 class LanguageSelector {
     constructor() {
         this.currentLanguage = localStorage.getItem('selectedLanguage') || 'it';
+        this.cache = new Map(); // Cache per i dati delle API
         this.init();
     }
 
@@ -49,18 +50,50 @@ class LanguageSelector {
     }
 
     changeLanguage(newLanguage) {
+        // Evita ricaricamenti inutili se la lingua è già quella corrente
+        if (this.currentLanguage === newLanguage) {
+            return;
+        }
+        
+        const oldLanguage = this.currentLanguage;
         this.currentLanguage = newLanguage;
         localStorage.setItem('selectedLanguage', newLanguage);
         this.updatePageContent();
         
         // Ricarica i dati se siamo nella pagina del menu
         if (window.location.pathname.includes('menu')) {
+            this.updateMenuContent(oldLanguage, newLanguage);
+        }
+    }
+
+    async updateMenuContent(oldLanguage, newLanguage) {
+        // Verifica se abbiamo i dati in cache
+        const cacheKey = `categories-${newLanguage}`;
+        
+        if (this.cache.has(cacheKey)) {
+            // Usa i dati dalla cache
+            console.log('Usando dati dalla cache per lingua:', newLanguage);
+            categorie = this.cache.get(cacheKey);
+            mostraCategorie();
+        } else {
+            // Carica i dati e salvali in cache
+            console.log('Caricando dati per lingua:', newLanguage);
             if (typeof caricaCategorie === 'function' && typeof mostraCategorie === 'function') {
-                caricaCategorie().then(() => {
+                try {
+                    await caricaCategorie();
+                    // Salva in cache per uso futuro
+                    this.cache.set(cacheKey, [...categorie]);
                     mostraCategorie();
-                });
+                } catch (error) {
+                    console.error('Errore nel caricamento delle categorie:', error);
+                }
             }
         }
+    }
+
+    // Metodo per pulire la cache quando necessario
+    clearCache() {
+        this.cache.clear();
     }
 
     updatePageContent() {

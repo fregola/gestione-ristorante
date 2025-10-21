@@ -15,24 +15,60 @@ let categorieCorrente = [];
 let categoriaGenitoreCorrente = null;
 let ultimoAggiornamento = Date.now();
 
-// Funzione per controllare aggiornamenti periodicamente
+// Cache per i dati delle categorie e prodotti
+let cacheCategorie = null;
+let cacheProdotti = new Map();
+let cacheTimestamp = 0;
+const CACHE_DURATION = 30000; // 30 secondi
+
+// Funzione per controllare aggiornamenti periodicamente (solo se Socket.IO non è disponibile)
 function controllaAggiornamenti() {
-    fetch('/api/menu/last-update')
-        .then(response => response.json())
-        .then(data => {
-            if (data.timestamp > ultimoAggiornamento) {
-                console.log('Rilevato aggiornamento - ricarico pagina');
-                ultimoAggiornamento = data.timestamp;
-                window.location.reload();
-            }
-        })
-        .catch(error => {
-            console.log('Errore nel controllo aggiornamenti:', error);
-        });
+    // Solo se non abbiamo Socket.IO attivo
+    if (!socket) {
+        fetch('/api/menu/last-update')
+            .then(response => response.json())
+            .then(data => {
+                if (data.timestamp > ultimoAggiornamento) {
+                    console.log('Rilevato aggiornamento - aggiorno cache e ricarico dati');
+                    ultimoAggiornamento = data.timestamp;
+                    // Invalida cache e ricarica solo i dati necessari
+                    invalidaCacheEAggiorna();
+                }
+            })
+            .catch(error => {
+                console.log('Errore nel controllo aggiornamenti:', error);
+            });
+    }
 }
 
-// Avvia il controllo periodico ogni 2 secondi
-setInterval(controllaAggiornamenti, 2000);
+// Funzione per invalidare cache e aggiornare solo i dati necessari
+function invalidaCacheEAggiorna() {
+    cacheCategorie = null;
+    cacheProdotti.clear();
+    cacheTimestamp = 0;
+    
+    // Ricarica solo le categorie se siamo nella vista principale
+    if (document.querySelector('.categories-grid')) {
+        caricaCategorie().then(() => {
+            mostraCategorie();
+        });
+    }
+    
+    // Se stiamo visualizzando prodotti di una categoria, ricarica quelli
+    const categoriaAttiva = document.querySelector('.category-products');
+    if (categoriaAttiva) {
+        const categoriaId = categoriaAttiva.dataset.categoriaId;
+        if (categoriaId) {
+            visualizzaProdottiCategoria(parseInt(categoriaId), categoriaAttiva.dataset.nomeCategoria);
+        }
+    }
+}
+
+// Avvia il controllo periodico ogni 30 secondi (solo se Socket.IO non è disponibile)
+// Ridotto ulteriormente perché ora non ricarica tutta la pagina
+if (!socket) {
+    setInterval(controllaAggiornamenti, 30000);
+}
 
 // Funzione per mostrare notifica
 function showToast(message) {
@@ -143,18 +179,48 @@ function createCategoryBox(categoria) {
     `;
 }
 
-// Funzione per caricare le categorie
+// Funzione per caricare le categorie con cache
+// Variabile per il debouncing delle richieste
+let caricamentoCategorieInCorso = false;
+
 function caricaCategorie() {
+    // Evita richieste multiple simultanee
+    if (caricamentoCategorieInCorso) {
+        return Promise.resolve();
+    }
+    
+    // Controlla se abbiamo dati in cache validi
+    const now = Date.now();
+    if (cacheCategorie && (now - cacheTimestamp) < CACHE_DURATION) {
+        categorie = cacheCategorie;
+        console.log('Categorie caricate dalla cache:', categorie);
+        return Promise.resolve();
+    }
+    
+    caricamentoCategorieInCorso = true;
     const lang = window.languageSelector ? window.languageSelector.getCurrentLanguage() : 'it';
+    
     return fetch(`/api/categorie-menu?lang=${lang}`)
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
             categorie = data;
-            console.log('Categorie caricate:', categorie);
+            // Aggiorna cache
+            cacheCategorie = data;
+            cacheTimestamp = now;
+            console.log('Categorie caricate dal server:', categorie);
         })
         .catch(error => {
             console.error('Errore nel caricamento delle categorie:', error);
             showToast('Errore nel caricamento delle categorie');
+            throw error; // Re-throw per permettere al chiamante di gestire l'errore
+        })
+        .finally(() => {
+            caricamentoCategorieInCorso = false;
         });
 }
 
@@ -243,11 +309,10 @@ async function inizializzaMenu() {
 if (socket) {
     socket.on('prodotto_aggiunto', function(prodotto) {
         console.log('Nuovo prodotto aggiunto:', prodotto);
-        // Se il prodotto è disponibile, ricarica la visualizzazione
+        // Se il prodotto è disponibile, aggiorna solo i dati necessari
         if (prodotto.disponibile) {
-            setTimeout(() => {
-                window.location.reload();
-            }, 1000);
+            // Invalida cache e aggiorna la vista corrente
+            invalidaCacheEAggiorna();
             showToast(`Nuovo prodotto aggiunto: ${prodotto.nome}`);
         }
     });
@@ -257,45 +322,87 @@ if (socket) {
         console.log('Prodotto:', prodotto);
         console.log('Disponibile:', prodotto.disponibile);
         
+        // Invalida cache per la categoria del prodotto
+        if (cacheProdotti.has(prodotto.categoria_id)) {
+            cacheProdotti.delete(prodotto.categoria_id);
+        }
+        
         // Trova e aggiorna il prodotto nella visualizzazione corrente
         const prodottoElement = document.querySelector(`[data-prodotto-id="${prodotto.id}"]`);
         console.log('Elemento trovato:', prodottoElement);
         
         if (prodotto.disponibile) {
-            // Se il prodotto è ora disponibile e non è visibile, ricarica la pagina
+            // Se il prodotto è ora disponibile e non è visibile, aggiorna la vista
             if (!prodottoElement) {
-                console.log('Prodotto disponibile ma non visibile - ricarico pagina');
-                setTimeout(() => {
-                    window.location.reload();
-                }, 500);
+                console.log('Prodotto disponibile ma non visibile - aggiorno vista');
+                invalidaCacheEAggiorna();
                 showToast(`${prodotto.nome} è ora disponibile!`);
+            } else {
+                // Aggiorna i dati del prodotto esistente
+                aggiornaElementoProdotto(prodottoElement, prodotto);
+                showToast(`${prodotto.nome} aggiornato!`);
             }
         } else {
-            // Se il prodotto non è più disponibile e è visibile, ricarica la pagina
+            // Se il prodotto non è più disponibile e è visibile, rimuovilo o aggiornalo
             if (prodottoElement) {
-                console.log('Prodotto non disponibile e visibile - ricarico pagina');
+                console.log('Prodotto non più disponibile - aggiorno vista');
+                invalidaCacheEAggiorna();
                 showToast(`${prodotto.nome} non è più disponibile`);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 500);
             }
         }
     });
 
     socket.on('prodotto_eliminato', function(data) {
         console.log('Prodotto eliminato:', data);
+        // Rimuovi dalla cache e aggiorna la vista
+        cacheProdotti.forEach((prodotti, categoriaId) => {
+            const index = prodotti.findIndex(p => p.id === data.id);
+            if (index !== -1) {
+                prodotti.splice(index, 1);
+            }
+        });
         
-        // Rimuovi il prodotto dalla visualizzazione se presente
+        // Rimuovi l'elemento dalla vista se presente
         const prodottoElement = document.querySelector(`[data-prodotto-id="${data.id}"]`);
         if (prodottoElement) {
-            prodottoElement.style.transition = 'opacity 0.5s ease-out';
-            prodottoElement.style.opacity = '0';
-            setTimeout(() => {
-                prodottoElement.remove();
-                showToast(`Prodotto eliminato`);
-            }, 500);
+            prodottoElement.remove();
         }
+        
+        showToast('Prodotto eliminato');
     });
+}
+
+// Funzione per aggiornare un elemento prodotto esistente nella vista
+function aggiornaElementoProdotto(elemento, prodotto) {
+    // Aggiorna il nome del prodotto
+    const nomeElement = elemento.querySelector('.card-title');
+    if (nomeElement) {
+        nomeElement.textContent = prodotto.nome;
+    }
+    
+    // Aggiorna la descrizione
+    const descrizioneElement = elemento.querySelector('.card-text');
+    if (descrizioneElement) {
+        descrizioneElement.textContent = prodotto.descrizione;
+    }
+    
+    // Aggiorna il prezzo
+    const prezzoElement = elemento.querySelector('.price');
+    if (prezzoElement) {
+        prezzoElement.textContent = `€${prodotto.prezzo.toFixed(2)}`;
+    }
+    
+    // Aggiorna l'immagine se presente
+    if (prodotto.foto) {
+        const imgElement = elemento.querySelector('.card-img-top');
+        if (imgElement) {
+            imgElement.src = `/static/uploads/${prodotto.foto}`;
+        }
+    }
+    
+    // Aggiorna gli attributi data
+    elemento.setAttribute('data-prodotto-id', prodotto.id);
+    elemento.setAttribute('data-categoria-id', prodotto.categoria_id);
 }
 
 function mostraProdottiConNavigazione() {
@@ -431,9 +538,29 @@ document.addEventListener('DOMContentLoaded', function() {
     inizializzaMenu();
 });
 
-// Funzione per visualizzare i prodotti di una categoria specifica
+// Funzione per visualizzare i prodotti di una categoria specifica con cache
 function visualizzaProdottiCategoria(categoriaId, nomeCategoria) {
     console.log(`Caricamento prodotti per categoria: ${nomeCategoria} (ID: ${categoriaId})`);
+    
+    const lang = window.languageSelector ? window.languageSelector.getCurrentLanguage() : 'it';
+    const cacheKey = `${categoriaId}_${lang}`;
+    const now = Date.now();
+    
+    // Controlla se abbiamo dati in cache validi per questa categoria
+    if (cacheProdotti.has(cacheKey)) {
+        const cachedData = cacheProdotti.get(cacheKey);
+        if ((now - cachedData.timestamp) < CACHE_DURATION) {
+            console.log(`Prodotti caricati dalla cache per categoria: ${nomeCategoria}`);
+            prodottiCorrente = cachedData.data.prodotti;
+            categorieCorrente = cachedData.data.categorie_figlie;
+            categoriaGenitoreCorrente = cachedData.data.categoria;
+            mostraProdottiConNavigazione();
+            return;
+        } else {
+            // Cache scaduta, rimuovi
+            cacheProdotti.delete(cacheKey);
+        }
+    }
     
     // Mostra loading
     const container = document.getElementById('categories-boxes-container');
@@ -448,8 +575,12 @@ function visualizzaProdottiCategoria(categoriaId, nomeCategoria) {
         </div>
     `;
     
-    // Carica i prodotti della categoria
-    const lang = window.languageSelector ? window.languageSelector.getCurrentLanguage() : 'it';
+    // Aggiungi attributi per identificare la vista corrente
+    container.setAttribute('data-categoria-id', categoriaId);
+    container.setAttribute('data-nome-categoria', nomeCategoria);
+    container.classList.add('category-products');
+    
+    // Carica i prodotti della categoria dal server
     fetch(`/api/prodotti/categoria/${categoriaId}?lang=${lang}`)
         .then(response => {
             if (!response.ok) {
@@ -461,6 +592,12 @@ function visualizzaProdottiCategoria(categoriaId, nomeCategoria) {
             prodottiCorrente = data.prodotti;
             categorieCorrente = data.categorie_figlie;
             categoriaGenitoreCorrente = data.categoria;
+            
+            // Salva in cache
+            cacheProdotti.set(cacheKey, {
+                data: data,
+                timestamp: now
+            });
             
             console.log(`Caricati ${data.totale_prodotti} prodotti per la categoria ${nomeCategoria}`);
             console.log('Categorie figlie trovate:', categorieCorrente);

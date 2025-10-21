@@ -64,8 +64,7 @@ gestione-ristorante/
 
 5. **Accedi all'applicazione:**
    - URL: `http://localhost:5001` o `https://ordinalosubito.it`
-   - **Username:** `admin`
-   - **Password:** `admin123`
+   - **Credenziali:** Consulta il file `SECURITY.md` per le credenziali di accesso
 
 ## 🔐 Configurazione Sicurezza
 
