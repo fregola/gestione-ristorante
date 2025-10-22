@@ -3,12 +3,26 @@
 let allergeni = [];
 let allergeniFiltrati = [];
 
+// Connessione SocketIO
+const socket = io();
+
 // Carica gli allergeni all'avvio
 document.addEventListener('DOMContentLoaded', function() {
     caricaAllergeni();
     
     // Event listener per la ricerca
     document.getElementById('searchInput').addEventListener('input', filtraAllergeni);
+});
+
+// Listener per aggiornamenti real-time
+socket.on('allergene_eliminato', function(data) {
+    console.log('Allergene eliminato:', data);
+    caricaAllergeni(); // Ricarica la lista degli allergeni
+});
+
+socket.on('allergene_aggiornato', function(data) {
+    console.log('Allergene aggiornato:', data);
+    caricaAllergeni(); // Ricarica la lista degli allergeni
 });
 
 function caricaAllergeni() {
@@ -39,7 +53,7 @@ function mostraAllergeni() {
     if (allergeniFiltrati.length === 0) {
         container.innerHTML = `
             <tr>
-                <td colspan="3" class="text-center py-4 text-muted">
+                <td colspan="2" class="text-center py-4 text-muted">
                     <i class="fas fa-search me-2"></i>Nessun allergene trovato
                 </td>
             </tr>
@@ -61,9 +75,6 @@ function creaAllergeneRow(allergene) {
     row.innerHTML = `
         <td>
             <strong>${allergene.nome}</strong>
-        </td>
-        <td>
-            ${allergene.descrizione || '<span class="text-muted">Nessuna descrizione</span>'}
         </td>
         <td>
             <button class="btn btn-sm btn-warning me-1" onclick="modificaAllergene(${allergene.id})" title="Modifica">
@@ -89,8 +100,7 @@ function filtraAllergeni() {
     
     allergeniFiltrati = allergeni.filter(allergene => {
         const matchSearch = !searchTerm || 
-            allergene.nome.toLowerCase().includes(searchTerm) ||
-            (allergene.descrizione && allergene.descrizione.toLowerCase().includes(searchTerm));
+            allergene.nome.toLowerCase().includes(searchTerm);
         
         return matchSearch;
     });
@@ -113,7 +123,6 @@ function modificaAllergene(id) {
     document.getElementById('allergeneId').value = allergene.id;
     document.getElementById('allergeneNome').value = allergene.nome;
     document.getElementById('allergeneIcona').value = allergene.icona || 'default';
-    document.getElementById('allergeneDescrizione').value = allergene.descrizione || '';
     
     new bootstrap.Modal(document.getElementById('allergeneModal')).show();
 }
@@ -122,12 +131,19 @@ function salvaAllergene() {
     const id = document.getElementById('allergeneId').value;
     const data = {
         nome: document.getElementById('allergeneNome').value.trim(),
-        icona: document.getElementById('allergeneIcona').value,
-        descrizione: document.getElementById('allergeneDescrizione').value.trim()
+        icona: document.getElementById('allergeneIcona').value
     };
     
-    if (!data.nome) {
-        alert('Il nome dell\'allergene è obbligatorio');
+    if (!nome.trim()) {
+        modalConfirm.show({
+            title: 'Campo Obbligatorio',
+            message: 'Il nome dell\'allergene è obbligatorio',
+            subtext: 'Inserisci un nome valido per l\'allergene.',
+            confirmText: 'OK',
+            confirmClass: 'btn-primary',
+            icon: 'fas fa-exclamation-triangle text-warning',
+            showCancel: false
+        });
         return;
     }
     
@@ -145,12 +161,28 @@ function salvaAllergene() {
             bootstrap.Modal.getInstance(document.getElementById('allergeneModal')).hide();
             caricaAllergeni();
         } else {
-            alert('Errore nel salvataggio dell\'allergene');
+            modalConfirm.show({
+                title: 'Errore Salvataggio',
+                message: 'Errore nel salvataggio dell\'allergene',
+                subtext: result.message || 'Si è verificato un errore durante il salvataggio.',
+                confirmText: 'OK',
+                confirmClass: 'btn-primary',
+                icon: 'fas fa-exclamation-triangle text-danger',
+                showCancel: false
+            });
         }
     })
     .catch(error => {
         console.error('Errore nel salvataggio allergene:', error);
-        alert('Errore nel salvataggio dell\'allergene');
+        modalConfirm.show({
+            title: 'Errore di Connessione',
+            message: 'Errore nel salvataggio dell\'allergene',
+            subtext: 'Verifica la connessione e riprova.',
+            confirmText: 'OK',
+            confirmClass: 'btn-primary',
+            icon: 'fas fa-exclamation-triangle text-danger',
+            showCancel: false
+        });
     });
 }
 
@@ -158,19 +190,44 @@ function eliminaAllergene(id) {
     const allergene = allergeni.find(a => a.id === id);
     if (!allergene) return;
     
-    if (confirm(`Sei sicuro di voler eliminare l'allergene "${allergene.nome}"?\n\nATTENZIONE: Questa azione potrebbe compromettere la sicurezza alimentare se l'allergene è utilizzato nei prodotti.`)) {
-        fetch(`/api/allergeni/${id}`, {method: 'DELETE'})
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    caricaAllergeni();
-                } else {
-                    alert('Errore nell\'eliminazione dell\'allergene');
-                }
-            })
-            .catch(error => {
-                console.error('Errore nell\'eliminazione allergene:', error);
-                alert('Errore nell\'eliminazione dell\'allergene');
-            });
-    }
+    modalConfirm.show({
+        title: 'Conferma Eliminazione Allergene',
+        message: `Sei sicuro di voler eliminare l'allergene "${allergene.nome}"?`,
+        subtext: 'ATTENZIONE: Questa azione potrebbe compromettere la sicurezza alimentare se l\'allergene è utilizzato nei prodotti.',
+        confirmText: 'Elimina',
+        confirmClass: 'btn-danger',
+        icon: 'fas fa-exclamation-triangle text-danger'
+    }).then(confirmed => {
+        if (confirmed) {
+            fetch(`/api/allergeni/${id}`, {method: 'DELETE'})
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        caricaAllergeni();
+                    } else {
+                        modalConfirm.show({
+                            title: 'Errore Eliminazione',
+                            message: 'Errore nell\'eliminazione dell\'allergene',
+                            subtext: result.error || 'Non è possibile completare l\'operazione richiesta.',
+                            confirmText: 'OK',
+                            confirmClass: 'btn-primary',
+                            icon: 'fas fa-exclamation-triangle text-warning',
+                            showCancel: false
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nell\'eliminazione allergene:', error);
+                    modalConfirm.show({
+                        title: 'Errore di Connessione',
+                        message: 'Errore nell\'eliminazione dell\'allergene',
+                        subtext: 'Verifica la connessione e riprova.',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-primary',
+                        icon: 'fas fa-exclamation-triangle text-danger',
+                        showCancel: false
+                    });
+                });
+        }
+    });
 }

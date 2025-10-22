@@ -216,5 +216,6 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include 'modal-confirm-include.html' %}
 <script src="{{ url_for('static', filename='js/gestione-prodotti.js') }}"></script>
 {% endblock %}

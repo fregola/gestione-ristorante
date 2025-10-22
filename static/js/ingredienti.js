@@ -1,12 +1,26 @@
 let ingredienti = [];
 let ingredientiFiltrati = [];
 
+// Connessione SocketIO
+const socket = io();
+
 // Carica gli ingredienti all'avvio
 document.addEventListener('DOMContentLoaded', function() {
     caricaIngredienti();
     
     // Event listeners per ricerca
     document.getElementById('searchInput').addEventListener('input', filtraIngredienti);
+});
+
+// Listener per aggiornamenti real-time
+socket.on('ingrediente_eliminato', function(data) {
+    console.log('Ingrediente eliminato:', data);
+    caricaIngredienti(); // Ricarica la lista degli ingredienti
+});
+
+socket.on('ingrediente_aggiornato', function(data) {
+    console.log('Ingrediente aggiornato:', data);
+    caricaIngredienti(); // Ricarica la lista degli ingredienti
 });
 
 function caricaIngredienti() {
@@ -51,10 +65,11 @@ function mostraIngredienti() {
 }
 
 function creaIngredienteRow(ingrediente) {
+    const iconaDisplay = ingrediente.icona ? `<span class="me-2">${ingrediente.icona}</span>` : '';
     return `
         <tr>
-            <td><strong>${ingrediente.nome}</strong></td>
-            <td>${ingrediente.descrizione || '-'}</td>
+            <td>${iconaDisplay}<strong>${ingrediente.nome}</strong></td>
+            <td>${ingrediente.icona || '-'}</td>
             <td>
                 <button class="btn btn-sm btn-warning me-1" onclick="modificaIngrediente(${ingrediente.id})" title="Modifica">
                     <i class="fas fa-edit"></i>
@@ -77,7 +92,7 @@ function filtraIngredienti() {
     ingredientiFiltrati = ingredienti.filter(ingrediente => {
         const matchesSearch = !searchTerm || 
             ingrediente.nome.toLowerCase().includes(searchTerm) ||
-            (ingrediente.descrizione && ingrediente.descrizione.toLowerCase().includes(searchTerm));
+            (ingrediente.icona && ingrediente.icona.toLowerCase().includes(searchTerm));
         
         return matchesSearch;
     });
@@ -99,7 +114,7 @@ function modificaIngrediente(id) {
     document.getElementById('ingredienteModalTitle').textContent = 'Modifica Ingrediente';
     document.getElementById('ingredienteId').value = ingrediente.id;
     document.getElementById('ingredienteNome').value = ingrediente.nome;
-    document.getElementById('ingredienteDescrizione').value = ingrediente.descrizione || '';
+    document.getElementById('ingredienteIcona').value = ingrediente.icona || '';
     
     new bootstrap.Modal(document.getElementById('ingredienteModal')).show();
 }
@@ -108,11 +123,19 @@ function salvaIngrediente() {
     const id = document.getElementById('ingredienteId').value;
     const data = {
         nome: document.getElementById('ingredienteNome').value,
-        descrizione: document.getElementById('ingredienteDescrizione').value
+        icona: document.getElementById('ingredienteIcona').value
     };
     
-    if (!data.nome.trim()) {
-        alert('Il nome dell\'ingrediente è obbligatorio');
+    if (!nome.trim()) {
+        modalConfirm.show({
+            title: 'Campo Obbligatorio',
+            message: 'Il nome dell\'ingrediente è obbligatorio',
+            subtext: 'Inserisci un nome valido per l\'ingrediente.',
+            confirmText: 'OK',
+            confirmClass: 'btn-primary',
+            icon: 'fas fa-exclamation-triangle text-warning',
+            showCancel: false
+        });
         return;
     }
     
@@ -130,29 +153,73 @@ function salvaIngrediente() {
             bootstrap.Modal.getInstance(document.getElementById('ingredienteModal')).hide();
             caricaIngredienti();
         } else {
-            alert('Errore nel salvataggio: ' + (result.message || 'Errore sconosciuto'));
+            modalConfirm.show({
+                title: 'Errore Salvataggio',
+                message: 'Errore nel salvataggio: ' + (result.message || 'Errore sconosciuto'),
+                subtext: 'Si è verificato un errore durante il salvataggio.',
+                confirmText: 'OK',
+                confirmClass: 'btn-primary',
+                icon: 'fas fa-exclamation-triangle text-danger',
+                showCancel: false
+            });
         }
     })
     .catch(error => {
         console.error('Errore nel salvataggio ingrediente:', error);
-        alert('Errore nel salvataggio dell\'ingrediente');
+        modalConfirm.show({
+            title: 'Errore di Connessione',
+            message: 'Errore nel salvataggio dell\'ingrediente',
+            subtext: 'Verifica la connessione e riprova.',
+            confirmText: 'OK',
+            confirmClass: 'btn-primary',
+            icon: 'fas fa-exclamation-triangle text-danger',
+            showCancel: false
+        });
     });
 }
 
 function eliminaIngrediente(id) {
-    if (confirm('Sei sicuro di voler eliminare questo ingrediente?')) {
-        fetch(`/api/ingredienti/${id}`, {method: 'DELETE'})
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    caricaIngredienti();
-                } else {
-                    alert('Errore nell\'eliminazione: ' + (result.message || 'Errore sconosciuto'));
-                }
-            })
-            .catch(error => {
-                console.error('Errore nell\'eliminazione ingrediente:', error);
-                alert('Errore nell\'eliminazione dell\'ingrediente');
-            });
-    }
+    const ingrediente = ingredienti.find(i => i.id === id);
+    if (!ingrediente) return;
+    
+    modalConfirm.show({
+        title: 'Conferma Eliminazione Ingrediente',
+        message: `Sei sicuro di voler eliminare l'ingrediente "${ingrediente.nome}"?`,
+        subtext: 'Questa azione non può essere annullata.',
+        confirmText: 'Elimina',
+        confirmClass: 'btn-danger',
+        icon: 'fas fa-trash text-danger'
+    }).then(confirmed => {
+        if (confirmed) {
+            fetch(`/api/ingredienti/${id}`, {method: 'DELETE'})
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        caricaIngredienti();
+                    } else {
+                        modalConfirm.show({
+                            title: 'Errore Eliminazione',
+                            message: 'Errore nell\'eliminazione dell\'ingrediente',
+                            subtext: result.error || 'Non è possibile completare l\'operazione richiesta.',
+                            confirmText: 'OK',
+                            confirmClass: 'btn-primary',
+                            icon: 'fas fa-exclamation-triangle text-warning',
+                            showCancel: false
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nell\'eliminazione ingrediente:', error);
+                    modalConfirm.show({
+                        title: 'Errore di Connessione',
+                        message: 'Errore nell\'eliminazione dell\'ingrediente',
+                        subtext: 'Verifica la connessione e riprova.',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-primary',
+                        icon: 'fas fa-exclamation-triangle text-danger',
+                        showCancel: false
+                    });
+                });
+        }
+    });
 }

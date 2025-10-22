@@ -170,15 +170,14 @@ function mostraAllergeni() {
         card.innerHTML = `
             <div class="item-header">
                 <div>
-                    <span class="allergene-color" style="background-color: ${allergene.colore}"></span>
                     <strong>${allergene.nome}</strong>
-                    ${allergene.icona ? `<i class="${allergene.icona} ms-2"></i>` : ''}
+                    ${allergene.icona ? `<span class="ms-2">${allergene.icona}</span>` : ''}
                 </div>
                 <div>
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="modificaAllergene(${allergene.id})">
+                    <button class="btn btn-sm btn-outline-primary me-1" onclick="event.stopPropagation(); modificaAllergene(${allergene.id})">
                         <i class="fas fa-edit"></i>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="eliminaAllergene(${allergene.id})">
+                    <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); eliminaAllergene(${allergene.id})">
                         <i class="fas fa-trash"></i>
                     </button>
                 </div>
@@ -194,7 +193,6 @@ function aggiungiAllergene() {
     document.getElementById('allergeneModalTitle').textContent = 'Aggiungi Allergene';
     document.getElementById('allergeneForm').reset();
     document.getElementById('allergeneId').value = '';
-    document.getElementById('allergeneColore').value = '#ff6b6b';
     new bootstrap.Modal(document.getElementById('allergeneModal')).show();
 }
 
@@ -207,7 +205,6 @@ function modificaAllergene(id) {
     document.getElementById('allergeneNome').value = allergene.nome;
     document.getElementById('allergeneDescrizione').value = allergene.descrizione || '';
     document.getElementById('allergeneIcona').value = allergene.icona || '';
-    document.getElementById('allergeneColore').value = allergene.colore || '#ff6b6b';
     
     new bootstrap.Modal(document.getElementById('allergeneModal')).show();
 }
@@ -217,8 +214,7 @@ function salvaAllergene() {
     const data = {
         nome: document.getElementById('allergeneNome').value,
         descrizione: document.getElementById('allergeneDescrizione').value,
-        icona: document.getElementById('allergeneIcona').value,
-        colore: document.getElementById('allergeneColore').value
+        icona: document.getElementById('allergeneIcona').value
     };
     
     const url = id ? `/api/allergeni/${id}` : '/api/allergeni';
@@ -240,16 +236,47 @@ function salvaAllergene() {
 }
 
 function eliminaAllergene(id) {
-    if (confirm('Sei sicuro di voler eliminare questo allergene?')) {
-        fetch(`/api/allergeni/${id}`, {method: 'DELETE'})
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    caricaAllergeni();
-                }
-            })
-            .catch(error => console.error('Errore nell\'eliminazione allergene:', error));
-    }
+    const allergene = allergeni.find(a => a.id === id);
+    if (!allergene) return;
+    
+    confirmDelete(allergene.nome, 'l\'allergene').then(confirmed => {
+        if (confirmed) {
+            fetch(`/api/allergeni/${id}`, {method: 'DELETE'})
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => Promise.reject(err));
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    if (result.success) {
+                        caricaAllergeni();
+                    } else {
+                        modalConfirm.show({
+                            title: 'Errore Eliminazione',
+                            message: 'Errore nell\'eliminazione dell\'allergene',
+                            subtext: result.error || 'Non è possibile completare l\'operazione richiesta.',
+                            confirmText: 'OK',
+                            confirmClass: 'btn-primary',
+                            icon: 'fas fa-exclamation-triangle text-warning',
+                            showCancel: false
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nell\'eliminazione allergene:', error);
+                    modalConfirm.show({
+                        title: 'Errore di Connessione',
+                        message: 'Errore nell\'eliminazione dell\'allergene',
+                        subtext: 'Verifica la connessione e riprova.',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-primary',
+                        icon: 'fas fa-exclamation-triangle text-danger',
+                        showCancel: false
+                    });
+                });
+        }
+    });
 }
 
 // === INGREDIENTI ===
@@ -270,7 +297,7 @@ function mostraIngredienti() {
     // Raggruppa per categoria
     const categorieIngredienti = {};
     ingredienti.forEach(ing => {
-        const cat = ing.categoria_ingrediente || 'Altro';
+        const cat = 'Ingredienti';
         if (!categorieIngredienti[cat]) {
             categorieIngredienti[cat] = [];
         }
@@ -293,13 +320,12 @@ function mostraIngredienti() {
                 <div class="item-header">
                     <div>
                         <strong>${ingrediente.nome}</strong>
-                        ${ingrediente.categoria_ingrediente ? `<small class="text-muted ms-2">(${ingrediente.categoria_ingrediente})</small>` : ''}
                     </div>
                     <div>
-                        <button class="btn btn-sm btn-outline-primary me-1" onclick="modificaIngrediente(${ingrediente.id})">
+                        <button class="btn btn-sm btn-outline-primary me-1" onclick="event.stopPropagation(); modificaIngrediente(${ingrediente.id})">
                             <i class="fas fa-edit"></i>
                         </button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="eliminaIngrediente(${ingrediente.id})">
+                        <button class="btn btn-sm btn-outline-danger" onclick="event.stopPropagation(); eliminaIngrediente(${ingrediente.id})">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
@@ -327,7 +353,6 @@ function modificaIngrediente(id) {
     document.getElementById('ingredienteId').value = ingrediente.id;
     document.getElementById('ingredienteNome').value = ingrediente.nome;
     document.getElementById('ingredienteDescrizione').value = ingrediente.descrizione || '';
-    document.getElementById('ingredienteCategoria').value = ingrediente.categoria_ingrediente || '';
     
     new bootstrap.Modal(document.getElementById('ingredienteModal')).show();
 }
@@ -336,8 +361,7 @@ function salvaIngrediente() {
     const id = document.getElementById('ingredienteId').value;
     const data = {
         nome: document.getElementById('ingredienteNome').value,
-        descrizione: document.getElementById('ingredienteDescrizione').value,
-        categoria_ingrediente: document.getElementById('ingredienteCategoria').value
+        descrizione: document.getElementById('ingredienteDescrizione').value
     };
     
     const url = id ? `/api/ingredienti/${id}` : '/api/ingredienti';
@@ -359,14 +383,45 @@ function salvaIngrediente() {
 }
 
 function eliminaIngrediente(id) {
-    if (confirm('Sei sicuro di voler eliminare questo ingrediente?')) {
-        fetch(`/api/ingredienti/${id}`, {method: 'DELETE'})
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    caricaIngredienti();
-                }
-            })
-            .catch(error => console.error('Errore nell\'eliminazione ingrediente:', error));
-    }
+    const ingrediente = ingredienti.find(i => i.id === id);
+    if (!ingrediente) return;
+    
+    confirmDelete(ingrediente.nome, 'l\'ingrediente').then(confirmed => {
+        if (confirmed) {
+            fetch(`/api/ingredienti/${id}`, {method: 'DELETE'})
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => Promise.reject(err));
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    if (result.success) {
+                        caricaIngredienti();
+                    } else {
+                        modalConfirm.show({
+                            title: 'Errore Eliminazione',
+                            message: 'Errore nell\'eliminazione dell\'ingrediente',
+                            subtext: result.error || 'Non è possibile completare l\'operazione richiesta.',
+                            confirmText: 'OK',
+                            confirmClass: 'btn-primary',
+                            icon: 'fas fa-exclamation-triangle text-warning',
+                            showCancel: false
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nell\'eliminazione ingrediente:', error);
+                    modalConfirm.show({
+                        title: 'Errore di Connessione',
+                        message: 'Errore nell\'eliminazione dell\'ingrediente',
+                        subtext: 'Verifica la connessione e riprova.',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-primary',
+                        icon: 'fas fa-exclamation-triangle text-danger',
+                        showCancel: false
+                    });
+                });
+        }
+    });
 }

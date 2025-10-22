@@ -1,8 +1,22 @@
 let categorie = [];
 
+// Connessione SocketIO
+const socket = io();
+
 // Carica le categorie all'avvio
 document.addEventListener('DOMContentLoaded', function() {
     caricaCategorie();
+});
+
+// Listener per aggiornamenti real-time
+socket.on('categoria_eliminata', function(data) {
+    console.log('Categoria eliminata:', data);
+    caricaCategorie(); // Ricarica la lista delle categorie
+});
+
+socket.on('categoria_aggiornata', function(data) {
+    console.log('Categoria aggiornata:', data);
+    caricaCategorie(); // Ricarica la lista delle categorie
 });
 
 function caricaCategorie() {
@@ -227,8 +241,16 @@ function salvaCategoria() {
         descrizione: document.getElementById('categoriaDescrizione').value.trim()
     };
     
-    if (!data.nome) {
-        alert('Il nome della categoria è obbligatorio');
+    if (!nome.trim()) {
+        modalConfirm.show({
+            title: 'Campo Obbligatorio',
+            message: 'Il nome della categoria è obbligatorio',
+            subtext: 'Inserisci un nome valido per la categoria.',
+            confirmText: 'OK',
+            confirmClass: 'btn-primary',
+            icon: 'fas fa-exclamation-triangle text-warning',
+            showCancel: false
+        });
         return;
     }
     
@@ -246,12 +268,28 @@ function salvaCategoria() {
             bootstrap.Modal.getInstance(document.getElementById('categoriaModal')).hide();
             caricaCategorie();
         } else {
-            alert('Errore nel salvataggio della categoria');
+            modalConfirm.show({
+                title: 'Errore Salvataggio',
+                message: 'Errore nel salvataggio della categoria',
+                subtext: result.message || 'Si è verificato un errore durante il salvataggio.',
+                confirmText: 'OK',
+                confirmClass: 'btn-primary',
+                icon: 'fas fa-exclamation-triangle text-danger',
+                showCancel: false
+            });
         }
     })
     .catch(error => {
         console.error('Errore nel salvataggio categoria:', error);
-        alert('Errore nel salvataggio della categoria');
+        modalConfirm.show({
+            title: 'Errore di Connessione',
+            message: 'Errore nel salvataggio della categoria',
+            subtext: 'Verifica la connessione e riprova.',
+            confirmText: 'OK',
+            confirmClass: 'btn-primary',
+            icon: 'fas fa-exclamation-triangle text-danger',
+            showCancel: false
+        });
     });
 }
 
@@ -262,26 +300,58 @@ function eliminaCategoria(id) {
     // Controlla se ha sottocategorie
     const hasSottocategorie = categorie.some(c => c.parent_id === id);
     
-    let messaggio = `Sei sicuro di voler eliminare la categoria "${categoria.nome}"?`;
+    let message = `Sei sicuro di voler eliminare la categoria "${categoria.nome}"?`;
+    let subtext = '';
+    
     if (hasSottocategorie) {
-        messaggio += '\n\nATTENZIONE: Questa categoria ha delle sottocategorie che verranno eliminate insieme ad essa.';
+        subtext = 'Attenzione: questa categoria ha delle sottocategorie che verranno eliminate insieme ad essa.';
     }
     
-    if (confirm(messaggio)) {
-        fetch(`/api/categorie/${id}`, {method: 'DELETE'})
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    caricaCategorie();
-                } else {
-                    alert('Errore nell\'eliminazione della categoria');
-                }
-            })
-            .catch(error => {
-                console.error('Errore nell\'eliminazione categoria:', error);
-                alert('Errore nell\'eliminazione della categoria');
-            });
-    }
+    modalConfirm.show({
+        title: 'Conferma Eliminazione',
+        message: message,
+        subtext: subtext,
+        confirmText: 'Elimina',
+        confirmClass: 'btn-danger',
+        icon: 'fas fa-trash text-danger'
+    }).then(confirmed => {
+        if (confirmed) {
+            fetch(`/api/categorie/${id}`, {method: 'DELETE'})
+                .then(response => {
+                    if (!response.ok) {
+                        return response.json().then(err => Promise.reject(err));
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    if (result.success) {
+                        caricaCategorie();
+                    } else {
+                        modalConfirm.show({
+                            title: 'Errore Eliminazione',
+                            message: result.error || 'Errore sconosciuto nell\'eliminazione',
+                            subtext: 'Non è possibile completare l\'operazione richiesta.',
+                            confirmText: 'OK',
+                            confirmClass: 'btn-primary',
+                            icon: 'fas fa-exclamation-triangle text-warning',
+                            showCancel: false
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore nell\'eliminazione categoria:', error);
+                    modalConfirm.show({
+                        title: 'Errore di Connessione',
+                        message: error.error || 'Errore nell\'eliminazione della categoria',
+                        subtext: 'Verifica la connessione e riprova.',
+                        confirmText: 'OK',
+                        confirmClass: 'btn-primary',
+                        icon: 'fas fa-exclamation-triangle text-danger',
+                        showCancel: false
+                    });
+                });
+        }
+    });
 }
 
 function aggiornaSelectCategorie() {

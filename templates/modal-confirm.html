@@ -1,0 +1,46 @@
+<!-- 
+    Template per il sistema di modali di conferma personalizzate
+    Include questo template nelle pagine dove vuoi utilizzare le modali personalizzate
+    
+    Utilizzo:
+    {% include 'modal-confirm.html' %}
+    
+    Poi nel JavaScript:
+    - confirmDelete('Nome Elemento', 'tipo elemento')
+    - customConfirm('Messaggio personalizzato')
+    - modalConfirm.show({...opzioni...})
+-->
+
+<!-- CSS per le modali personalizzate -->
+<link href="{{ url_for('static', filename='css/modal-confirm.css') }}" rel="stylesheet">
+
+<!-- JavaScript per le modali personalizzate -->
+<script src="{{ url_for('static', filename='js/modal-confirm.js') }}"></script>
+
+<!-- 
+    Esempi di utilizzo nel JavaScript:
+
+    // Conferma eliminazione semplice
+    if (await confirmDelete('Margherita', 'la pizza')) {
+        // Procedi con l'eliminazione
+    }
+
+    // Conferma personalizzata
+    if (await customConfirm('Vuoi davvero procedere?')) {
+        // Procedi con l'azione
+    }
+
+    // Configurazione avanzata
+    const result = await modalConfirm.show({
+        title: 'Attenzione',
+        message: 'Questa operazione modificherà i dati',
+        subtext: 'Assicurati di aver fatto un backup',
+        confirmText: 'Procedi',
+        confirmClass: 'btn-warning',
+        icon: 'fas fa-exclamation-triangle text-warning'
+    });
+    
+    if (result) {
+        // L'utente ha confermato
+    }
+-->

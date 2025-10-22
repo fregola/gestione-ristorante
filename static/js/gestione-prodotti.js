@@ -524,21 +524,37 @@ function saveProdotto() {
 }
 
 function deleteProdotto(id, nome) {
-    if (confirm(`Sei sicuro di voler eliminare "${nome}"?`)) {
-        fetch(`/api/menu/${id}`, {
-            method: 'DELETE'
-        })
-        .then(response => response.json())
-        .then(result => {
-            if (result.success) {
-                showToast('Prodotto eliminato!');
-            }
-        })
-        .catch(error => {
-            console.error('Errore:', error);
-            showToast('Errore durante l\'eliminazione!', 'error');
-        });
-    }
+    modalConfirm.show({
+        title: 'Conferma Eliminazione Prodotto',
+        message: `Sei sicuro di voler eliminare "${nome}"?`,
+        subtext: 'Questa azione non può essere annullata.',
+        confirmText: 'Elimina',
+        confirmClass: 'btn-danger',
+        icon: 'fas fa-trash text-danger'
+    }).then(confirmed => {
+        if (confirmed) {
+            fetch(`/api/menu/${id}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    showToast('Prodotto eliminato!');
+                    // Rimuovi la riga dalla tabella immediatamente
+                    const existingRow = document.querySelector(`tr[data-prodotto-id="${id}"]`);
+                    if (existingRow) {
+                        existingRow.remove();
+                    }
+                } else {
+                    showToast('Errore durante l\'eliminazione!', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Errore:', error);
+                showToast('Errore durante l\'eliminazione!', 'error');
+            });
+        }
+    });
 }
 
 function deleteProdottoFromData(button) {

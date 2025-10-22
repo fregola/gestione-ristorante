@@ -37,7 +37,7 @@
         <div class="row">
             <div class="col-12">
                 <input type="text" class="search-box" id="searchInput" 
-                       placeholder="Cerca allergeni per nome o descrizione...">
+                       placeholder="Cerca allergeni per nome...">
             </div>
         </div>
     </div>
@@ -49,13 +49,12 @@
                         <thead class="table-dark">
                             <tr>
                                 <th>Nome</th>
-                                <th>Descrizione</th>
                                 <th width="120">Azioni</th>
                             </tr>
                         </thead>
                         <tbody id="allergens-list">
                             <tr>
-                                <td colspan="3" class="text-center py-4">
+                                <td colspan="2" class="text-center py-4">
                                     <div class="spinner-border text-warning" role="status">
                                         <span class="visually-hidden">Caricamento...</span>
                                     </div>
@@ -103,14 +102,6 @@
                             Se lasci vuoto, verrà usata l'icona predefinita (triangolo giallo).
                         </div>
                     </div>
-                    
-                    <div class="mb-3">
-                        <label for="allergeneDescrizione" class="form-label">
-                            <i class="fas fa-align-left me-1"></i>Descrizione
-                        </label>
-                        <textarea class="form-control" id="allergeneDescrizione" rows="4"
-                                  placeholder="Descrizione dell'allergene..."></textarea>
-                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -127,5 +118,6 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include 'modal-confirm-include.html' %}
 <script src="{{ url_for('static', filename='js/allergeni.js') }}"></script>
 {% endblock %}
