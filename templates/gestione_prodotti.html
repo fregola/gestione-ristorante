@@ -54,10 +54,14 @@
                                 <td><strong>{{ prodotto[1] }}</strong></td>
                                 <td class="text-success"><strong>€{{ "%.2f"|format(prodotto[3]) }}</strong></td>
                                 <td>
-                                    <span class="badge bg-primary">{{ prodotto[4] or 'Generale' }}</span>
+                                    {% if prodotto[4] %}
+                                    <span class="badge bg-primary">{{ prodotto[4] }}</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Nessuna categoria</span>
+                                    {% endif %}
                                 </td>
                                 <td>
-                                    {% if prodotto[7] %}
+                                    {% if prodotto[6] %}
                                     <span class="badge bg-success">
                                         <i class="fas fa-check me-1"></i>Sì
                                     </span>
@@ -73,9 +77,9 @@
                                             data-nome="{{ prodotto[1] }}" 
                                             data-descrizione="{{ prodotto[2] or '' }}" 
                                             data-prezzo="{{ prodotto[3] }}" 
-                                            data-categoria-id="{{ prodotto[5] or '' }}" 
-                                            data-foto="{{ prodotto[6] or '' }}"
-                                            data-disponibile="{{ 'true' if prodotto[7] else 'false' }}"
+                                            data-categoria-id="{{ prodotto[5] or '' }}"
+                                            data-foto="{{ prodotto[7] or '' }}"
+                                            data-disponibile="{{ 'true' if prodotto[6] else 'false' }}"
                                             data-allergeni="{{ prodotto[8] or '' }}"
                                             data-ingredienti="{{ prodotto[9] or '' }}"
                                             data-allergeni-ids="{{ prodotto[10] or '' }}"
@@ -153,14 +157,13 @@
                     
                     <div class="mb-3">
                         <label for="categoria" class="form-label">Categoria *</label>
-                        <select class="form-control" id="categoria" required>
-                            <option value="">Seleziona categoria</option>
-                        </select>
-                        <div class="form-text">
-                            <small>
-                                <i class="fas fa-info-circle me-1"></i>
-                                Non trovi la categoria? <a href="{{ url_for('categorie') }}" target="_blank">Gestisci categorie</a>
-                            </small>
+                        <div class="d-flex align-items-center">
+                            <select class="form-select me-2" id="categoria" required>
+                                <option value="">Seleziona una categoria...</option>
+                            </select>
+                            <a href="/categorie" class="btn btn-outline-primary btn-sm" target="_blank" title="Gestisci Categorie">
+                                <i class="fas fa-cog"></i>
+                            </a>
                         </div>
                     </div>
                     

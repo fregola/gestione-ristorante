@@ -154,7 +154,8 @@ function mostraCategorie() {
                     </td>
                 `;
                 tbody.appendChild(sottocategorieRow);
-            }
+            }           
+
         });
     }
 

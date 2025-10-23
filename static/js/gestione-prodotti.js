@@ -7,9 +7,9 @@ const socket = io();
 
 // Variabili globali
 let isEditing = false;
-let categorie = [];
 let allergeni = [];
 let ingredienti = [];
+let categorie = [];
 let dataLoaded = false; // Flag per evitare ricaricamenti inutili
 
 console.log('=== VARIABILI GLOBALI INIZIALIZZATE ===');
@@ -24,96 +24,25 @@ function showToast(message, type = 'success') {
     toast.show();
 }
 
-// Carica categorie dal database (con cache)
-function loadCategorie() {
-    if (categorie.length > 0) {
-        return Promise.resolve(); // Usa cache se già caricate
-    }
-    
-    return fetch('/api/categorie', {credentials: 'include'})
-        .then(response => response.json())
-        .then(data => {
-            // L'API restituisce {categorie: [...]}
-            categorie = data.categorie || [];
-            const categoriaSelect = document.getElementById('categoria');
-            categoriaSelect.innerHTML = '<option value="">Seleziona categoria</option>';
-            
-            // Raggruppa le categorie per genitore
-            const categorieGenitore = [];
-            const categorieFiglie = {};
-            
-            categorie.forEach(categoria => {
-                if (categoria.parent_id === null) {
-                    // È una categoria genitore
-                    categorieGenitore.push(categoria);
-                    categorieFiglie[categoria.id] = [];
-                } else {
-                    // È una categoria figlia
-                    if (!categorieFiglie[categoria.parent_id]) {
-                        categorieFiglie[categoria.parent_id] = [];
-                    }
-                    categorieFiglie[categoria.parent_id].push(categoria);
-                }
-            });
-            
-            // Aggiungi le categorie al select in modo gerarchico
-            categorieGenitore.forEach(genitore => {
-                // Aggiungi la categoria genitore
-                const optionGenitore = document.createElement('option');
-                optionGenitore.value = genitore.id;
-                optionGenitore.textContent = genitore.nome;
-                optionGenitore.style.fontWeight = 'bold';
-                categoriaSelect.appendChild(optionGenitore);
-                
-                // Aggiungi le categorie figlie se esistono
-                if (categorieFiglie[genitore.id] && categorieFiglie[genitore.id].length > 0) {
-                    categorieFiglie[genitore.id].forEach(figlia => {
-                        const optionFiglia = document.createElement('option');
-                        optionFiglia.value = figlia.id;
-                        optionFiglia.textContent = `    ↳ ${figlia.nome}`;
-                        optionFiglia.style.paddingLeft = '20px';
-                        optionFiglia.style.color = '#6c757d';
-                        categoriaSelect.appendChild(optionFiglia);
-                    });
-                }
-            });
-        })
-        .catch(error => {
-            console.error('Errore nel caricamento delle categorie:', error);
-            showToast('Errore nel caricamento delle categorie', 'error');
-        });
-}
-
 // Carica allergeni dal database (con cache)
 function loadAllergeni() {
-    if (allergeni.length > 0) {
-        return Promise.resolve(); // Usa cache se già caricati
-    }
-    
     return fetch('/api/allergeni', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             allergeni = data.allergeni || [];
+            
             const allergeniContainer = document.getElementById('allergeni-container');
             allergeniContainer.innerHTML = '';
             
             allergeni.forEach(allergene => {
                 const checkboxDiv = document.createElement('div');
                 checkboxDiv.className = 'form-check';
-                
-                const checkbox = document.createElement('input');
-                checkbox.className = 'form-check-input';
-                checkbox.type = 'checkbox';
-                checkbox.id = `allergene-${allergene.id}`;
-                checkbox.value = allergene.id;
-                
-                const label = document.createElement('label');
-                label.className = 'form-check-label';
-                label.htmlFor = `allergene-${allergene.id}`;
-                label.textContent = allergene.nome;
-                
-                checkboxDiv.appendChild(checkbox);
-                checkboxDiv.appendChild(label);
+                checkboxDiv.innerHTML = `
+                    <input class="form-check-input" type="checkbox" value="${allergene.id}" id="allergene-${allergene.id}">
+                    <label class="form-check-label" for="allergene-${allergene.id}">
+                        ${allergene.nome}
+                    </label>
+                `;
                 allergeniContainer.appendChild(checkboxDiv);
             });
         })
@@ -125,34 +54,23 @@ function loadAllergeni() {
 
 // Carica ingredienti dal database (con cache)
 function loadIngredienti() {
-    if (ingredienti.length > 0) {
-        return Promise.resolve(); // Usa cache se già caricati
-    }
-    
     return fetch('/api/ingredienti', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             ingredienti = data.ingredienti || [];
+            
             const ingredientiContainer = document.getElementById('ingredienti-container');
             ingredientiContainer.innerHTML = '';
             
             ingredienti.forEach(ingrediente => {
                 const checkboxDiv = document.createElement('div');
                 checkboxDiv.className = 'form-check';
-                
-                const checkbox = document.createElement('input');
-                checkbox.className = 'form-check-input';
-                checkbox.type = 'checkbox';
-                checkbox.id = `ingrediente-${ingrediente.id}`;
-                checkbox.value = ingrediente.id;
-                
-                const label = document.createElement('label');
-                label.className = 'form-check-label';
-                label.htmlFor = `ingrediente-${ingrediente.id}`;
-                label.textContent = ingrediente.nome;
-                
-                checkboxDiv.appendChild(checkbox);
-                checkboxDiv.appendChild(label);
+                checkboxDiv.innerHTML = `
+                    <input class="form-check-input" type="checkbox" value="${ingrediente.id}" id="ingrediente-${ingrediente.id}">
+                    <label class="form-check-label" for="ingrediente-${ingrediente.id}">
+                        ${ingrediente.nome}
+                    </label>
+                `;
                 ingredientiContainer.appendChild(checkboxDiv);
             });
         })
@@ -162,22 +80,74 @@ function loadIngredienti() {
         });
 }
 
-// Carica tutti i dati una sola volta
+// Carica categorie dal database (con cache)
+function loadCategorie() {
+    return fetch('/api/categorie', {credentials: 'include'})
+        .then(response => response.json())
+        .then(data => {
+            categorie = data.categorie || [];
+            
+            const categoriaSelect = document.getElementById('categoria');
+            categoriaSelect.innerHTML = '<option value="">Seleziona categoria</option>';
+            
+            // Separa categorie genitore e figlie
+            const categorieGenitore = categorie.filter(cat => !cat.parent_id);
+            const categorieFiglie = categorie.filter(cat => cat.parent_id);
+            
+            // Per ogni categoria genitore, aggiungi prima la genitore e poi le sue figlie
+            categorieGenitore.forEach(genitore => {
+                // Aggiungi la categoria genitore
+                const optionGenitore = document.createElement('option');
+                optionGenitore.value = genitore.id;
+                optionGenitore.textContent = genitore.nome;
+                categoriaSelect.appendChild(optionGenitore);
+                
+                // Trova e aggiungi le categorie figlie di questa genitore
+                const figlieDiQuestaGenitore = categorieFiglie.filter(figlia => figlia.parent_id === genitore.id);
+                figlieDiQuestaGenitore.forEach(figlia => {
+                    const optionFiglia = document.createElement('option');
+                    optionFiglia.value = figlia.id;
+                    optionFiglia.textContent = `${genitore.nome} -- ${figlia.nome}`;
+                    optionFiglia.style.paddingLeft = '20px';
+                    optionFiglia.style.fontStyle = 'italic';
+                    categoriaSelect.appendChild(optionFiglia);
+                });
+            });
+            
+            // Aggiungi eventuali categorie figlie orfane (senza genitore valido)
+            const figlieOrfane = categorieFiglie.filter(figlia => 
+                !categorieGenitore.some(genitore => genitore.id === figlia.parent_id)
+            );
+            if (figlieOrfane.length > 0) {
+                figlieOrfane.forEach(figlia => {
+                    const option = document.createElement('option');
+                    option.value = figlia.id;
+                    option.textContent = `${figlia.nome} (categoria orfana)`;
+                    categoriaSelect.appendChild(option);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Errore nel caricamento delle categorie:', error);
+            showToast('Errore nel caricamento delle categorie', 'error');
+        });
+}
+
+// Carica tutti i dati necessari
 async function loadAllData() {
-    if (dataLoaded) {
-        return Promise.resolve();
-    }
+    if (dataLoaded) return;
     
     try {
         await Promise.all([
-            loadCategorie(),
             loadAllergeni(),
-            loadIngredienti()
+            loadIngredienti(),
+            loadCategorie()
         ]);
         dataLoaded = true;
+        console.log('Tutti i dati caricati con successo');
     } catch (error) {
         console.error('Errore nel caricamento dei dati:', error);
-        throw error;
+        showToast('Errore nel caricamento dei dati', 'error');
     }
 }
 
@@ -230,15 +200,14 @@ function saveProdotto() {
     const nome = document.getElementById('nome').value;
     const descrizione = document.getElementById('descrizione').value;
     const prezzo = parseFloat(document.getElementById('prezzo').value);
-    const categoria_id = document.getElementById('categoria').value;
     const disponibile = document.getElementById('disponibile').checked;
     const fotoFile = document.getElementById('foto').files[0];
     
     console.log('=== DATI DA SALVARE ===');
     console.log('Disponibile checkbox checked:', disponibile);
     
-    if (!nome || !prezzo || !categoria_id) {
-        showToast('Nome, prezzo e categoria sono obbligatori!', 'error');
+    if (!nome || !prezzo) {
+        showToast('Nome e prezzo sono obbligatori!', 'error');
         return;
     }
     
@@ -253,7 +222,6 @@ function saveProdotto() {
     formData.append('nome', nome);
     formData.append('descrizione', descrizione);
     formData.append('prezzo', prezzo);
-    formData.append('categoria_id', categoria_id);
     formData.append('disponibile', disponibile);
     
     // Aggiungi allergeni selezionati
@@ -304,81 +272,6 @@ function saveProdotto() {
     });
 }
 
-function editProdotto(id, nome, descrizione, prezzo, categoria_id, disponibile, foto, allergeni, ingredienti) {
-    console.log('DEBUG editProdotto chiamata con:');
-    console.log('- categoria_id:', categoria_id);
-    console.log('- allergeni:', allergeni);
-    console.log('- ingredienti:', ingredienti);
-    
-    document.getElementById('prodottoId').value = id;
-    document.getElementById('nome').value = nome;
-    document.getElementById('descrizione').value = descrizione;
-    document.getElementById('prezzo').value = prezzo;
-    document.getElementById('disponibile').checked = disponibile;
-    
-    // Gestione foto esistente
-    const fotoPreview = document.getElementById('foto-preview');
-    const fotoPreviewImg = document.getElementById('foto-preview-img');
-    if (foto) {
-        fotoPreviewImg.src = `/static/${foto}`;
-        fotoPreview.style.display = 'block';
-    } else {
-        fotoPreview.style.display = 'none';
-    }
-    
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Modifica Prodotto';
-    isEditing = true;
-    
-    // Carica prima i dati, poi imposta i valori selezionati
-    Promise.all([
-        loadCategorie(),
-        loadAllergeni(), 
-        loadIngredienti()
-    ]).then(() => {
-        console.log('DEBUG: Dati caricati, ora imposto i valori');
-        
-        // Imposta la categoria dopo che le opzioni sono caricate
-        const categoriaSelect = document.getElementById('categoria');
-        console.log('DEBUG: Categoria select trovato:', categoriaSelect);
-        console.log('DEBUG: Opzioni disponibili:', Array.from(categoriaSelect.options).map(o => o.value));
-        categoriaSelect.value = categoria_id;
-        console.log('DEBUG: Categoria impostata a:', categoriaSelect.value);
-        
-        // Pre-seleziona allergeni esistenti
-        if (allergeni) {
-            console.log('DEBUG: Processando allergeni:', allergeni);
-            const allergeniArray = allergeni.split(',').map(a => a.trim());
-            console.log('DEBUG: Array allergeni:', allergeniArray);
-            const allergeniCheckboxes = document.querySelectorAll('#allergeni-container input[type="checkbox"]');
-            console.log('DEBUG: Checkbox allergeni trovate:', allergeniCheckboxes.length);
-            allergeniCheckboxes.forEach(checkbox => {
-                const labelText = checkbox.nextElementSibling.textContent.trim();
-                const shouldCheck = allergeniArray.includes(labelText);
-                console.log(`DEBUG: Checkbox "${labelText}" - dovrebbe essere checked: ${shouldCheck}`);
-                checkbox.checked = shouldCheck;
-            });
-        }
-        
-        // Pre-seleziona ingredienti esistenti
-        if (ingredienti) {
-            console.log('DEBUG: Processando ingredienti:', ingredienti);
-            const ingredientiArray = ingredienti.split(',').map(i => i.trim());
-            console.log('DEBUG: Array ingredienti:', ingredientiArray);
-            const ingredientiCheckboxes = document.querySelectorAll('#ingredienti-container input[type="checkbox"]');
-            console.log('DEBUG: Checkbox ingredienti trovate:', ingredientiCheckboxes.length);
-            ingredientiCheckboxes.forEach(checkbox => {
-                const labelText = checkbox.nextElementSibling.textContent.trim();
-                const shouldCheck = ingredientiArray.includes(labelText);
-                console.log(`DEBUG: Checkbox "${labelText}" - dovrebbe essere checked: ${shouldCheck}`);
-                checkbox.checked = shouldCheck;
-            });
-        }
-    });
-    
-    const modal = new bootstrap.Modal(document.getElementById('prodottoModal'));
-    modal.show();
-}
-
 async function editProdottoFromData(button) {
     console.log('=== INIZIO EDIT PRODOTTO ===');
     console.log('Button clicked:', button);
@@ -412,12 +305,7 @@ async function editProdottoFromData(button) {
         document.getElementById('nome').value = nome;
         document.getElementById('descrizione').value = descrizione;
         document.getElementById('prezzo').value = prezzo;
-        
-        // Imposta la categoria (senza delay)
-        const categoriaSelect = document.getElementById('categoria');
-        console.log('Impostando categoria ID:', categoriaId);
-        categoriaSelect.value = categoriaId;
-        console.log('Categoria selezionata:', categoriaSelect.value);
+        document.getElementById('categoria').value = categoriaId || '';
         
         console.log('Impostando disponibile:', disponibile);
         const disponibileCheckbox = document.getElementById('disponibile');
@@ -487,24 +375,32 @@ function saveProdotto() {
     const nome = document.getElementById('nome').value;
     const descrizione = document.getElementById('descrizione').value;
     const prezzo = parseFloat(document.getElementById('prezzo').value);
-    const categoria_id = document.getElementById('categoria').value;
+    const categoriaId = document.getElementById('categoria').value;
     const disponibile = document.getElementById('disponibile').checked;
     const fotoFile = document.getElementById('foto').files[0];
     
     console.log('=== DATI DA SALVARE ===');
     console.log('Disponibile checkbox checked:', disponibile);
     
-    if (!nome || !prezzo || !categoria_id) {
-        showToast('Nome, prezzo e categoria sono obbligatori!', 'error');
+    if (!nome || !prezzo) {
+        showToast('Nome e prezzo sono obbligatori!', 'error');
         return;
     }
+    
+    // Mostra loading sul pulsante
+    const saveButton = document.querySelector('.modal-footer .btn-success');
+    const originalText = saveButton.innerHTML;
+    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Salvando...';
+    saveButton.disabled = true;
     
     // Usa FormData per supportare l'upload di file
     const formData = new FormData();
     formData.append('nome', nome);
     formData.append('descrizione', descrizione);
     formData.append('prezzo', prezzo);
-    formData.append('categoria_id', categoria_id);
+    if (categoriaId) {
+        formData.append('categoria_id', categoriaId);
+    }
     formData.append('disponibile', disponibile);
     
     // Aggiungi allergeni selezionati
@@ -595,12 +491,11 @@ function deleteProdottoFromData(button) {
 // Funzioni per creare righe della tabella
 function createTableRow(prodotto) {
     const disponibileBadge = prodotto.disponibile 
-        ? '<span class="badge bg-success"><i class="fas fa-check me-1"></i>Sì</span>'
-        : '<span class="badge bg-danger"><i class="fas fa-times me-1"></i>No</span>';
+        ? '<span class="badge bg-success">Disponibile</span>' 
+        : '<span class="badge bg-danger">Non disponibile</span>';
     
     const nomeEscaped = (prodotto.nome || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
     const descrizioneEscaped = (prodotto.descrizione || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
-    const categoriaEscaped = (prodotto.categoria || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
     
     const fotoHtml = prodotto.foto 
         ? `<img src="/static/${prodotto.foto}" alt="${prodotto.nome}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">`
@@ -612,7 +507,6 @@ function createTableRow(prodotto) {
             <td>${fotoHtml}</td>
             <td><strong>${prodotto.nome}</strong></td>
             <td class="text-success"><strong>€${parseFloat(prodotto.prezzo).toFixed(2)}</strong></td>
-            <td><span class="badge bg-primary">${prodotto.categoria || 'Generale'}</span></td>
             <td>${disponibileBadge}</td>
             <td>
                 <button class="btn btn-sm btn-warning me-1" 
@@ -620,8 +514,10 @@ function createTableRow(prodotto) {
                         data-nome="${nomeEscaped}" 
                         data-descrizione="${descrizioneEscaped}" 
                         data-prezzo="${prodotto.prezzo}" 
-                        data-categoria="${categoriaEscaped}" 
                         data-disponibile="${prodotto.disponibile}"
+                        data-foto="${prodotto.foto || ''}"
+                        data-allergeni-ids="${prodotto.allergeni_ids || ''}"
+                        data-ingredienti-ids="${prodotto.ingredienti_ids || ''}"
                         onclick="editProdottoFromData(this)">
                     <i class="fas fa-edit"></i>
                 </button>
@@ -665,12 +561,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Carica i dati iniziali
     Promise.all([
-        loadCategorie(),
         loadAllergeni(), 
         loadIngredienti()
     ]).then(() => {
         console.log('=== DATI INIZIALI CARICATI ===');
-        console.log('Categorie:', categorie.length);
         console.log('Allergeni:', allergeni.length);
         console.log('Ingredienti:', ingredienti.length);
     }).catch(error => {

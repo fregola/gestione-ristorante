@@ -475,7 +475,7 @@ function mostraCategorie() {
                         <button class="btn btn-primary mt-auto" 
                                 onclick="visualizzaProdottiCategoria(${categoria.id}, '${categoria.nome.replace(/'/g, "\\'")}')">
                             <i class="fas fa-eye me-2"></i>
-                            Visualizza prodotti (${categoria.prodotti_count})
+                            Visualizza prodotti
                         </button>
                     </div>
                 </div>

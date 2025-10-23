@@ -165,7 +165,7 @@ def init_db():
     # Tabelle di traduzione rimosse per semplificare il database
     # Le traduzioni possono essere gestite direttamente nelle tabelle principali se necessario
 
-    # Tabella azienda per i dati dell'attività
+    # Tabella azienda per i dati d'attività
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS azienda (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -334,17 +334,11 @@ def gestione_prodotti():
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     
-    # Query ottimizzata 1: Ottieni solo i prodotti base con categorie
+    # Query ottimizzata 1: Ottieni solo i prodotti base
     cursor.execute('''
-        SELECT p.id, p.nome, p.descrizione, p.prezzo, 
-               CASE 
-                   WHEN parent.nome IS NOT NULL THEN parent.nome || ' > ' || c.nome
-                   ELSE c.nome
-               END as categoria_nome,
-               p.categoria_id, p.foto, p.disponibile
+        SELECT p.id, p.nome, p.descrizione, p.prezzo, c.nome as categoria_nome, p.categoria_id, p.foto, p.disponibile
         FROM prodotti p 
-        LEFT JOIN categorie c ON p.categoria_id = c.id 
-        LEFT JOIN categorie parent ON c.parent_id = parent.id
+        LEFT JOIN categorie c ON p.categoria_id = c.id
         WHERE p.attivo = 1
         ORDER BY p.nome
     ''')
@@ -410,8 +404,6 @@ def gestione_prodotti():
             prodotto['nome'],
             prodotto['descrizione'],
             prodotto['prezzo'],
-            prodotto['categoria_nome'],
-            prodotto['categoria_id'],
             prodotto['foto'],
             prodotto['disponibile'],
             ','.join(prodotto['allergeni']) if prodotto['allergeni'] else None,
@@ -436,7 +428,6 @@ def save_uploaded_file(file):
         file.save(filepath)
         return f"uploads/{unique_filename}"
     return None
-# API per aggiungere prodotto
 @app.route('/api/menu', methods=['POST'])
 @login_required
 def aggiungi_prodotto():
@@ -446,29 +437,21 @@ def aggiungi_prodotto():
         nome = request.form.get('nome')
         descrizione = request.form.get('descrizione')
         prezzo = float(request.form.get('prezzo'))
-        categoria_id = int(request.form.get('categoria_id'))
-        disponibile = request.form.get('disponibile', 'true').lower() == 'true'
+        categoria_id = request.form.get('categoria_id')
+        if categoria_id == '':
+            categoria_id = None
+        elif categoria_id:
+            categoria_id = int(categoria_id)
+        disponibile = request.form.get('disponibile', 'false').lower() == 'true'
+        
+        print(f"=== DEBUG BACKEND PUT ===")
+        print(f"Disponibile raw value: '{request.form.get('disponibile')}'")
+        print(f"Disponibile converted: {disponibile}")
+        print(f"All form data: {dict(request.form)}")
         
         # Gestione allergeni e ingredienti
         allergeni_json = request.form.get('allergeni', '[]')
         ingredienti_json = request.form.get('ingredienti', '[]')
-        
-        # Gestione foto
-        foto_path = None
-        if 'foto' in request.files:
-            file = request.files['foto']
-            if file.filename != '':
-                foto_path = save_uploaded_file(file)
-    else:
-        # JSON data (compatibilità con codice esistente)
-        data = request.get_json()
-        nome = data['nome']
-        descrizione = data['descrizione']
-        prezzo = data['prezzo']
-        categoria_id = data['categoria_id']
-        disponibile = data.get('disponibile', True)
-        allergeni_json = data.get('allergeni', '[]')
-        ingredienti_json = data.get('ingredienti', '[]')
         foto_path = None
     
     # Parse degli array JSON
@@ -549,7 +532,11 @@ def aggiorna_prodotto(prodotto_id):
         nome = request.form.get('nome')
         descrizione = request.form.get('descrizione')
         prezzo = float(request.form.get('prezzo'))
-        categoria_id = int(request.form.get('categoria_id'))
+        categoria_id = request.form.get('categoria_id')
+        if categoria_id == '':
+            categoria_id = None
+        elif categoria_id:
+            categoria_id = int(categoria_id)
         disponibile = request.form.get('disponibile', 'false').lower() == 'true'
         
         print(f"=== DEBUG BACKEND PUT ===")
@@ -566,37 +553,16 @@ def aggiorna_prodotto(prodotto_id):
         if 'foto' in request.files:
             file = request.files['foto']
             if file.filename != '':
-                # Elimina la vecchia foto se esiste
-                conn = sqlite3.connect('ristorante.db')
-                cursor = conn.cursor()
-                cursor.execute('SELECT foto FROM prodotti WHERE id = ?', (prodotto_id,))
-                old_foto = cursor.fetchone()
-                if old_foto and old_foto[0]:
-                    old_file_path = os.path.join('static', old_foto[0])
-                    if os.path.exists(old_file_path):
-                        try:
-                            os.remove(old_file_path)
-                            print(f"Vecchia foto eliminata: {old_file_path}")
-                        except OSError as e:
-                            print(f"Errore nell'eliminazione della vecchia foto {old_file_path}: {e}")
-                conn.close()
-                
                 foto_path = save_uploaded_file(file)
-        else:
-            # Mantieni la foto esistente se non viene caricata una nuova
-            conn = sqlite3.connect('ristorante.db')
-            cursor = conn.cursor()
-            cursor.execute('SELECT foto FROM prodotti WHERE id = ?', (prodotto_id,))
-            result = cursor.fetchone()
-            foto_path = result[0] if result else None
-            conn.close()
     else:
         # JSON data (compatibilità con codice esistente)
         data = request.get_json()
         nome = data['nome']
         descrizione = data['descrizione']
         prezzo = data['prezzo']
-        categoria_id = data['categoria_id']
+        categoria_id = data.get('categoria_id')
+        if categoria_id == '':
+            categoria_id = None
         disponibile = data.get('disponibile', True)
         allergeni_json = data.get('allergeni', '[]')
         ingredienti_json = data.get('ingredienti', '[]')
