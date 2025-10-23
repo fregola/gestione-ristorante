@@ -327,93 +327,63 @@ def menu():
     
     return render_template('menu.html', dati_azienda=dati_azienda)
 
-# Route per gestire i prodotti (con autenticazione) - OTTIMIZZATA
 @app.route('/gestione-prodotti')
 @login_required
 def gestione_prodotti():
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     
-    # Query ottimizzata 1: Ottieni solo i prodotti base
+    # Recupera tutti i prodotti con informazioni sulla categoria
     cursor.execute('''
-        SELECT p.id, p.nome, p.descrizione, p.prezzo, c.nome as categoria_nome, p.categoria_id, p.foto, p.disponibile
-        FROM prodotti p 
+        SELECT p.id, p.nome, p.prezzo, p.descrizione, c.nome as categoria_nome, 
+               p.categoria_id, p.disponibile, p.foto, '' as allergeni, '' as ingredienti
+        FROM prodotti p
         LEFT JOIN categorie c ON p.categoria_id = c.id
-        WHERE p.attivo = 1
         ORDER BY p.nome
     ''')
-    prodotti_base = cursor.fetchall()
+    prodotti_raw = cursor.fetchall()
     
-    # Crea un dizionario per i prodotti
-    prodotti_dict = {}
-    for prodotto in prodotti_base:
-        prodotti_dict[prodotto[0]] = {
-            'id': prodotto[0],
-            'nome': prodotto[1],
-            'descrizione': prodotto[2],
-            'prezzo': prodotto[3],
-            'categoria_nome': prodotto[4],
-            'categoria_id': prodotto[5],
-            'foto': prodotto[6],
-            'disponibile': prodotto[7],
-            'allergeni': [],
-            'ingredienti': [],
-            'allergeni_ids': [],
-            'ingredienti_ids': []
+    # Converte le tuple in dizionari per facilitare l'accesso nel template
+    prodotti = []
+    for row in prodotti_raw:
+        prodotto = {
+            'id': row[0],
+            'nome': row[1],
+            'prezzo': row[2],
+            'descrizione': row[3],
+            'categoria_nome': row[4],
+            'categoria_id': row[5],
+            'disponibile': row[6],
+            'foto': row[7],
+            'allergeni': row[8],
+            'ingredienti': row[9]
         }
+        prodotti.append(prodotto)
     
-    if prodotti_dict:
-        prodotti_ids = list(prodotti_dict.keys())
-        placeholders = ','.join(['?' for _ in prodotti_ids])
-        
-        # Query ottimizzata 2: Ottieni allergeni per tutti i prodotti
-        cursor.execute(f'''
-            SELECT pa.prodotto_id, a.nome, a.id
-            FROM prodotti_allergeni pa
-            JOIN allergeni a ON pa.allergene_id = a.id
-            WHERE pa.prodotto_id IN ({placeholders})
-            ORDER BY pa.prodotto_id, a.nome
-        ''', prodotti_ids)
-        
-        for row in cursor.fetchall():
-            prodotto_id, allergene_nome, allergene_id = row
-            if prodotto_id in prodotti_dict:
-                prodotti_dict[prodotto_id]['allergeni'].append(allergene_nome)
-                prodotti_dict[prodotto_id]['allergeni_ids'].append(str(allergene_id))
-        
-        # Query ottimizzata 3: Ottieni ingredienti per tutti i prodotti
-        cursor.execute(f'''
-            SELECT pi.prodotto_id, i.nome, i.id
-            FROM prodotti_ingredienti pi
-            JOIN ingredienti i ON pi.ingrediente_id = i.id
-            WHERE pi.prodotto_id IN ({placeholders})
-            ORDER BY pi.prodotto_id, i.nome
-        ''', prodotti_ids)
-        
-        for row in cursor.fetchall():
-            prodotto_id, ingrediente_nome, ingrediente_id = row
-            if prodotto_id in prodotti_dict:
-                prodotti_dict[prodotto_id]['ingredienti'].append(ingrediente_nome)
-                prodotti_dict[prodotto_id]['ingredienti_ids'].append(str(ingrediente_id))
+    # Recupera tutte le categorie con struttura genitore-figlio
+    cursor.execute('''
+        SELECT c.id, c.nome, c.parent_id, p.nome as parent_nome
+        FROM categorie c
+        LEFT JOIN categorie p ON c.parent_id = p.id
+        ORDER BY COALESCE(p.nome, c.nome), c.nome
+    ''')
+    categorie_raw = cursor.fetchall()
     
-    # Converti il dizionario in lista nel formato atteso dal template
-    prodotti_list = []
-    for prodotto in prodotti_dict.values():
-        prodotti_list.append((
-            prodotto['id'],
-            prodotto['nome'],
-            prodotto['descrizione'],
-            prodotto['prezzo'],
-            prodotto['foto'],
-            prodotto['disponibile'],
-            ','.join(prodotto['allergeni']) if prodotto['allergeni'] else None,
-            ','.join(prodotto['ingredienti']) if prodotto['ingredienti'] else None,
-            ','.join(prodotto['allergeni_ids']) if prodotto['allergeni_ids'] else None,
-            ','.join(prodotto['ingredienti_ids']) if prodotto['ingredienti_ids'] else None
-        ))
+    # Converte le categorie in dizionari con struttura genitore-figlio
+    categorie = []
+    for row in categorie_raw:
+        categoria = {
+            'id': row[0],
+            'nome': row[1],
+            'parent_id': row[2],
+            'parent_nome': row[3],
+            'nome_completo': f"{row[3]} > {row[1]}" if row[3] else row[1]
+        }
+        categorie.append(categoria)
     
     conn.close()
-    return render_template('gestione_prodotti.html', prodotti=prodotti_list)
+    
+    return render_template('gestione_prodotti.html', prodotti=prodotti, categorie=categorie)
 
 # API per aggiungere prodotto
 def allowed_file(filename):
@@ -522,155 +492,7 @@ def aggiungi_prodotto():
     
     return jsonify({'success': True, 'id': prodotto_id, 'foto': foto_path})
 
-# API per aggiornare prodotto
-@app.route('/api/menu/<int:prodotto_id>', methods=['PUT'])
-@login_required
-def aggiorna_prodotto(prodotto_id):
-    # Gestisce sia form-data (con file) che JSON
-    if request.content_type and 'multipart/form-data' in request.content_type:
-        # Form con file upload
-        nome = request.form.get('nome')
-        descrizione = request.form.get('descrizione')
-        prezzo = float(request.form.get('prezzo'))
-        categoria_id = request.form.get('categoria_id')
-        if categoria_id == '':
-            categoria_id = None
-        elif categoria_id:
-            categoria_id = int(categoria_id)
-        disponibile = request.form.get('disponibile', 'false').lower() == 'true'
-        
-        print(f"=== DEBUG BACKEND PUT ===")
-        print(f"Disponibile raw value: '{request.form.get('disponibile')}'")
-        print(f"Disponibile converted: {disponibile}")
-        print(f"All form data: {dict(request.form)}")
-        
-        # Gestione allergeni e ingredienti
-        allergeni_json = request.form.get('allergeni', '[]')
-        ingredienti_json = request.form.get('ingredienti', '[]')
-        
-        # Gestione foto
-        foto_path = None
-        if 'foto' in request.files:
-            file = request.files['foto']
-            if file.filename != '':
-                foto_path = save_uploaded_file(file)
-    else:
-        # JSON data (compatibilità con codice esistente)
-        data = request.get_json()
-        nome = data['nome']
-        descrizione = data['descrizione']
-        prezzo = data['prezzo']
-        categoria_id = data.get('categoria_id')
-        if categoria_id == '':
-            categoria_id = None
-        disponibile = data.get('disponibile', True)
-        allergeni_json = data.get('allergeni', '[]')
-        ingredienti_json = data.get('ingredienti', '[]')
-        
-        # Mantieni la foto esistente per aggiornamenti JSON
-        conn = sqlite3.connect('ristorante.db')
-        cursor = conn.cursor()
-        cursor.execute('SELECT foto FROM prodotti WHERE id = ?', (prodotto_id,))
-        result = cursor.fetchone()
-        foto_path = result[0] if result else None
-        conn.close()
-    
-    # Parse degli array JSON
-    import json
-    try:
-        allergeni_ids = json.loads(allergeni_json) if isinstance(allergeni_json, str) else allergeni_json
-        ingredienti_ids = json.loads(ingredienti_json) if isinstance(ingredienti_json, str) else ingredienti_json
-    except json.JSONDecodeError:
-        allergeni_ids = []
-        ingredienti_ids = []
-    
-    conn = sqlite3.connect('ristorante.db')
-    cursor = conn.cursor()
-    
-    try:
-        # Aggiorna il prodotto con traduzioni automatiche
-        cursor.execute('''
-            UPDATE prodotti 
-            SET nome = ?, descrizione = ?, prezzo = ?, categoria_id = ?, foto = ?, disponibile = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
-        ''', (nome, descrizione, prezzo, categoria_id, foto_path, disponibile, prodotto_id))
-        
-        # Chiudi la connessione temporaneamente per usare il servizio di traduzione
-        conn.commit()
-        conn.close()
-        
-        # Traduci e salva automaticamente nel database
-        translation_service.translate_and_save_product(prodotto_id, nome, descrizione)
-        
-        # Riapri la connessione per le associazioni
-        conn = sqlite3.connect('ristorante.db')
-        cursor = conn.cursor()
-        
-        # Rimuovi associazioni esistenti in batch
-        cursor.execute('DELETE FROM prodotti_allergeni WHERE prodotto_id = ?', (prodotto_id,))
-        cursor.execute('DELETE FROM prodotti_ingredienti WHERE prodotto_id = ?', (prodotto_id,))
-        
-        # Inserisci nuove associazioni con allergeni in batch
-        if allergeni_ids:
-            allergeni_data = [(prodotto_id, allergene_id) for allergene_id in allergeni_ids]
-            cursor.executemany('''
-                INSERT INTO prodotti_allergeni (prodotto_id, allergene_id) 
-                VALUES (?, ?)
-            ''', allergeni_data)
-        
-        # Inserisci nuove associazioni con ingredienti in batch
-        if ingredienti_ids:
-            # Gestisce sia array di ID che array di oggetti con id e quantita
-            ingredienti_data = []
-            for ingrediente in ingredienti_ids:
-                if isinstance(ingrediente, dict):
-                    # Formato: {"id": 1, "quantita": "100g"}
-                    ingrediente_id = ingrediente.get('id')
-                    quantita = ingrediente.get('quantita', '')
-                else:
-                    # Formato: solo ID numerico
-                    ingrediente_id = ingrediente
-                    quantita = ''
-                
-                if ingrediente_id:
-                    ingredienti_data.append((prodotto_id, ingrediente_id, quantita))
-            
-            if ingredienti_data:
-                cursor.executemany('''
-                    INSERT INTO prodotti_ingredienti (prodotto_id, ingrediente_id, quantita) 
-                    VALUES (?, ?, ?)
-                ''', ingredienti_data)
 
-        # Commit della transazione
-        conn.commit()
-        
-    except Exception as e:
-        # Rollback in caso di errore
-        conn.rollback()
-        print(f"Errore durante l'aggiornamento del prodotto: {e}")
-        return jsonify({'success': False, 'error': str(e)}), 500
-    finally:
-        conn.close()
-    
-    # Traduzioni automatiche disabilitate per migliorare le performance
-    # Le traduzioni possono essere aggiunte manualmente tramite l'interfaccia admin
-    
-    # Aggiorna il timestamp dell'ultimo aggiornamento
-    global ultimo_aggiornamento
-    ultimo_aggiornamento = int(time.time() * 1000)
-    
-    # Emetti aggiornamento in tempo reale
-    socketio.emit('prodotto_aggiornato', {
-        'id': prodotto_id,
-        'nome': nome,
-        'descrizione': descrizione,
-        'prezzo': prezzo,
-        'categoria_id': categoria_id,
-        'foto': foto_path,
-        'disponibile': disponibile
-    })
-    
-    return jsonify({'success': True, 'foto': foto_path})
 
 # API per eliminare prodotto
 @app.route('/api/menu/<int:prodotto_id>', methods=['DELETE'])
@@ -1370,6 +1192,145 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     print('Client disconnesso')
+
+# ===== API GESTIONE PRODOTTI =====
+
+# API per creare un nuovo prodotto
+@app.route('/api/gestione-prodotti', methods=['POST'])
+@login_required
+def crea_prodotto():
+    try:
+        # Gestisce sia form-data (con file) che JSON
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            nome = request.form.get('nome')
+            descrizione = request.form.get('descrizione', '')
+            prezzo = float(request.form.get('prezzo'))
+            categoria_id = request.form.get('categoria_id')
+            if categoria_id == '' or categoria_id == 'null':
+                categoria_id = None
+            elif categoria_id:
+                categoria_id = int(categoria_id)
+            disponibile = request.form.get('disponibile', 'false').lower() == 'true'
+            allergeni = request.form.get('allergeni', '')
+            ingredienti = request.form.get('ingredienti', '')
+            
+            # Gestione upload foto
+            foto_path = None
+            if 'foto' in request.files:
+                file = request.files['foto']
+                foto_path = save_uploaded_file(file)
+        else:
+            # JSON data
+            data = request.get_json()
+            nome = data.get('nome')
+            descrizione = data.get('descrizione', '')
+            prezzo = float(data.get('prezzo'))
+            categoria_id = data.get('categoria_id')
+            disponibile = data.get('disponibile', True)
+            allergeni = data.get('allergeni', '')
+            ingredienti = data.get('ingredienti', '')
+            foto_path = None
+
+        conn = sqlite3.connect('ristorante.db')
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            INSERT INTO prodotti (nome, descrizione, prezzo, categoria_id, disponibile, foto_path, allergeni, ingredienti, attivo)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+        ''', (nome, descrizione, prezzo, categoria_id, disponibile, foto_path, allergeni, ingredienti))
+        
+        prodotto_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'id': prodotto_id, 'message': 'Prodotto creato con successo'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# API per aggiornare un prodotto
+@app.route('/api/gestione-prodotti/<int:prodotto_id>', methods=['PUT'])
+@login_required
+def aggiorna_prodotto(prodotto_id):
+    try:
+        # Gestisce sia form-data (con file) che JSON
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            nome = request.form.get('nome')
+            descrizione = request.form.get('descrizione', '')
+            prezzo = float(request.form.get('prezzo'))
+            categoria_id = request.form.get('categoria_id')
+            if categoria_id == '' or categoria_id == 'null':
+                categoria_id = None
+            elif categoria_id:
+                categoria_id = int(categoria_id)
+            disponibile = request.form.get('disponibile', 'false').lower() == 'true'
+            allergeni = request.form.get('allergeni', '')
+            ingredienti = request.form.get('ingredienti', '')
+            
+            # Gestione upload foto
+            foto_path = None
+            if 'foto' in request.files and request.files['foto'].filename:
+                file = request.files['foto']
+                foto_path = save_uploaded_file(file)
+        else:
+            # JSON data
+            data = request.get_json()
+            nome = data.get('nome')
+            descrizione = data.get('descrizione', '')
+            prezzo = float(data.get('prezzo'))
+            categoria_id = data.get('categoria_id')
+            disponibile = data.get('disponibile', True)
+            allergeni = data.get('allergeni', '')
+            ingredienti = data.get('ingredienti', '')
+            foto_path = None
+
+        conn = sqlite3.connect('ristorante.db')
+        cursor = conn.cursor()
+        
+        # Se c'è una nuova foto, aggiorna anche il campo foto_path
+        if foto_path:
+            cursor.execute('''
+                UPDATE prodotti 
+                SET nome=?, descrizione=?, prezzo=?, categoria_id=?, disponibile=?, foto_path=?, allergeni=?, ingredienti=?
+                WHERE id=?
+            ''', (nome, descrizione, prezzo, categoria_id, disponibile, foto_path, allergeni, ingredienti, prodotto_id))
+        else:
+            cursor.execute('''
+                UPDATE prodotti 
+                SET nome=?, descrizione=?, prezzo=?, categoria_id=?, disponibile=?, allergeni=?, ingredienti=?
+                WHERE id=?
+            ''', (nome, descrizione, prezzo, categoria_id, disponibile, allergeni, ingredienti, prodotto_id))
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Prodotto aggiornato con successo'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+# API per eliminare un prodotto
+@app.route('/api/gestione-prodotti/<int:prodotto_id>', methods=['DELETE'])
+@login_required
+def elimina_prodotto_gestione(prodotto_id):
+    try:
+        conn = sqlite3.connect('ristorante.db')
+        cursor = conn.cursor()
+        
+        # Soft delete - imposta attivo = 0
+        cursor.execute('UPDATE prodotti SET attivo = 0 WHERE id = ?', (prodotto_id,))
+        
+        if cursor.rowcount == 0:
+            conn.close()
+            return jsonify({'success': False, 'message': 'Prodotto non trovato'}), 404
+        
+        conn.commit()
+        conn.close()
+        
+        return jsonify({'success': True, 'message': 'Prodotto eliminato con successo'})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
 
 # API per ottenere il timestamp dell'ultimo aggiornamento
 @app.route('/api/menu/last-update')

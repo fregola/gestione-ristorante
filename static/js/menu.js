@@ -236,7 +236,7 @@ function createProductCard(prodotto) {
     if (prodotto.foto) {
         cardContent += `
                 <div class="card-img-top-container">
-                    <img src="/static/${prodotto.foto}" class="card-img-top" alt="${prodotto.nome}" loading="lazy" style="height: 200px; object-fit: cover; width: 100%;">
+                    <img src="/static/uploads/${prodotto.foto}" class="card-img-top" alt="${prodotto.nome}" loading="lazy" style="height: 200px; object-fit: cover; width: 100%;">
                 </div>
         `;
     }

@@ -1,609 +1,329 @@
-// Gestione Prodotti - JavaScript separato
-// Test di caricamento JavaScript
-console.log('=== GESTIONE-PRODOTTI.JS CARICATO ===');
+// Gestione Prodotti - JavaScript
+let prodottiData = [];
+let isEditMode = false;
 
-// Socket.IO
-const socket = io();
+// Inizializzazione quando il DOM è caricato
+document.addEventListener('DOMContentLoaded', function() {
+    initializeEventListeners();
+    loadProdottiData();
+});
 
-// Variabili globali
-let isEditing = false;
-let allergeni = [];
-let ingredienti = [];
-let categorie = [];
-let dataLoaded = false; // Flag per evitare ricaricamenti inutili
-
-console.log('=== VARIABILI GLOBALI INIZIALIZZATE ===');
-
-// Funzioni di utilità
-function showToast(message, type = 'success') {
-    const toastIcon = document.querySelector('#notification-toast .toast-header i');
-    toastIcon.className = `fas fa-${type === 'success' ? 'check-circle text-success' : 'exclamation-circle text-danger'} me-2`;
+// Inizializza tutti gli event listeners
+function initializeEventListeners() {
+    // Filtri e ricerca
+    document.getElementById('filtroCategoria').addEventListener('change', applicaFiltri);
+    document.getElementById('filtroDisponibilita').addEventListener('change', applicaFiltri);
+    document.getElementById('cercaProdotto').addEventListener('input', applicaFiltri);
     
-    document.getElementById('toast-message').textContent = message;
-    const toast = new bootstrap.Toast(document.getElementById('notification-toast'));
-    toast.show();
-}
-
-// Carica allergeni dal database (con cache)
-function loadAllergeni() {
-    return fetch('/api/allergeni', {credentials: 'include'})
-        .then(response => response.json())
-        .then(data => {
-            allergeni = data.allergeni || [];
-            
-            const allergeniContainer = document.getElementById('allergeni-container');
-            allergeniContainer.innerHTML = '';
-            
-            allergeni.forEach(allergene => {
-                const checkboxDiv = document.createElement('div');
-                checkboxDiv.className = 'form-check';
-                checkboxDiv.innerHTML = `
-                    <input class="form-check-input" type="checkbox" value="${allergene.id}" id="allergene-${allergene.id}">
-                    <label class="form-check-label" for="allergene-${allergene.id}">
-                        ${allergene.nome}
-                    </label>
-                `;
-                allergeniContainer.appendChild(checkboxDiv);
-            });
-        })
-        .catch(error => {
-            console.error('Errore nel caricamento degli allergeni:', error);
-            showToast('Errore nel caricamento degli allergeni', 'error');
-        });
-}
-
-// Carica ingredienti dal database (con cache)
-function loadIngredienti() {
-    return fetch('/api/ingredienti', {credentials: 'include'})
-        .then(response => response.json())
-        .then(data => {
-            ingredienti = data.ingredienti || [];
-            
-            const ingredientiContainer = document.getElementById('ingredienti-container');
-            ingredientiContainer.innerHTML = '';
-            
-            ingredienti.forEach(ingrediente => {
-                const checkboxDiv = document.createElement('div');
-                checkboxDiv.className = 'form-check';
-                checkboxDiv.innerHTML = `
-                    <input class="form-check-input" type="checkbox" value="${ingrediente.id}" id="ingrediente-${ingrediente.id}">
-                    <label class="form-check-label" for="ingrediente-${ingrediente.id}">
-                        ${ingrediente.nome}
-                    </label>
-                `;
-                ingredientiContainer.appendChild(checkboxDiv);
-            });
-        })
-        .catch(error => {
-            console.error('Errore nel caricamento degli ingredienti:', error);
-            showToast('Errore nel caricamento degli ingredienti', 'error');
-        });
-}
-
-// Carica categorie dal database (con cache)
-function loadCategorie() {
-    return fetch('/api/categorie', {credentials: 'include'})
-        .then(response => response.json())
-        .then(data => {
-            categorie = data.categorie || [];
-            
-            const categoriaSelect = document.getElementById('categoria');
-            categoriaSelect.innerHTML = '<option value="">Seleziona categoria</option>';
-            
-            // Separa categorie genitore e figlie
-            const categorieGenitore = categorie.filter(cat => !cat.parent_id);
-            const categorieFiglie = categorie.filter(cat => cat.parent_id);
-            
-            // Per ogni categoria genitore, aggiungi prima la genitore e poi le sue figlie
-            categorieGenitore.forEach(genitore => {
-                // Aggiungi la categoria genitore
-                const optionGenitore = document.createElement('option');
-                optionGenitore.value = genitore.id;
-                optionGenitore.textContent = genitore.nome;
-                categoriaSelect.appendChild(optionGenitore);
-                
-                // Trova e aggiungi le categorie figlie di questa genitore
-                const figlieDiQuestaGenitore = categorieFiglie.filter(figlia => figlia.parent_id === genitore.id);
-                figlieDiQuestaGenitore.forEach(figlia => {
-                    const optionFiglia = document.createElement('option');
-                    optionFiglia.value = figlia.id;
-                    optionFiglia.textContent = `${genitore.nome} -- ${figlia.nome}`;
-                    optionFiglia.style.paddingLeft = '20px';
-                    optionFiglia.style.fontStyle = 'italic';
-                    categoriaSelect.appendChild(optionFiglia);
-                });
-            });
-            
-            // Aggiungi eventuali categorie figlie orfane (senza genitore valido)
-            const figlieOrfane = categorieFiglie.filter(figlia => 
-                !categorieGenitore.some(genitore => genitore.id === figlia.parent_id)
-            );
-            if (figlieOrfane.length > 0) {
-                figlieOrfane.forEach(figlia => {
-                    const option = document.createElement('option');
-                    option.value = figlia.id;
-                    option.textContent = `${figlia.nome} (categoria orfana)`;
-                    categoriaSelect.appendChild(option);
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Errore nel caricamento delle categorie:', error);
-            showToast('Errore nel caricamento delle categorie', 'error');
-        });
-}
-
-// Carica tutti i dati necessari
-async function loadAllData() {
-    if (dataLoaded) return;
+    // Form prodotto
+    document.getElementById('prodottoForm').addEventListener('submit', salvaProdotto);
     
-    try {
-        await Promise.all([
-            loadAllergeni(),
-            loadIngredienti(),
-            loadCategorie()
-        ]);
-        dataLoaded = true;
-        console.log('Tutti i dati caricati con successo');
-    } catch (error) {
-        console.error('Errore nel caricamento dei dati:', error);
-        showToast('Errore nel caricamento dei dati', 'error');
-    }
+    // Preview foto
+    document.getElementById('foto').addEventListener('change', previewFoto);
+    
+    // Reset form quando si chiude il modal
+    document.getElementById('prodottoModal').addEventListener('hidden.bs.modal', resetForm);
 }
 
-// Gestione anteprima foto
-function setupFotoPreview() {
-    const fotoInput = document.getElementById('foto');
-    const fotoPreview = document.getElementById('foto-preview');
-    const fotoPreviewImg = document.getElementById('foto-preview-img');
+// Carica i dati dei prodotti dalla tabella
+function loadProdottiData() {
+    const rows = document.querySelectorAll('#prodottiTableBody tr');
+    prodottiData = Array.from(rows).map(row => ({
+        element: row,
+        categoria: row.dataset.categoria,
+        disponibile: row.dataset.disponibile,
+        nome: row.dataset.nome
+    }));
+}
+
+// Applica i filtri alla tabella
+function applicaFiltri() {
+    const filtroCategoria = document.getElementById('filtroCategoria').value;
+    const filtroDisponibilita = document.getElementById('filtroDisponibilita').value;
+    const cercaProdotto = document.getElementById('cercaProdotto').value.toLowerCase();
     
-    fotoInput.addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                fotoPreviewImg.src = e.target.result;
-                fotoPreview.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
-        } else {
-            fotoPreview.style.display = 'none';
+    prodottiData.forEach(prodotto => {
+        let mostra = true;
+        
+        // Filtro categoria
+        if (filtroCategoria && prodotto.categoria !== filtroCategoria) {
+            mostra = false;
         }
+        
+        // Filtro disponibilità
+        if (filtroDisponibilita && prodotto.disponibile !== filtroDisponibilita) {
+            mostra = false;
+        }
+        
+        // Ricerca per nome
+        if (cercaProdotto && !prodotto.nome.includes(cercaProdotto)) {
+            mostra = false;
+        }
+        
+        prodotto.element.style.display = mostra ? '' : 'none';
     });
 }
 
-function removeFotoPreview() {
-    document.getElementById('foto').value = '';
-    document.getElementById('foto-preview').style.display = 'none';
-}
-
+// Reset del form
 function resetForm() {
     document.getElementById('prodottoForm').reset();
     document.getElementById('prodottoId').value = '';
+    document.getElementById('prodottoModalLabel').textContent = 'Nuovo Prodotto';
+    document.getElementById('fotoPreview').innerHTML = '';
+    isEditMode = false;
     
-    // Deseleziona tutti i checkbox degli allergeni
-    const allergeniCheckboxes = document.querySelectorAll('#allergeni-container input[type="checkbox"]');
-    allergeniCheckboxes.forEach(checkbox => checkbox.checked = false);
-    
-    // Deseleziona tutti i checkbox degli ingredienti
-    const ingredientiCheckboxes = document.querySelectorAll('#ingredienti-container input[type="checkbox"]');
-    ingredientiCheckboxes.forEach(checkbox => checkbox.checked = false);
-    
-    document.getElementById('modalTitle').innerHTML = '<i class="fas fa-plus me-2"></i>Aggiungi Prodotto';
-    document.getElementById('foto-preview').style.display = 'none';
-    isEditing = false;
+    // Rimuovi classi di validazione
+    document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
 }
 
-// Funzioni CRUD
-function saveProdotto() {
-    const id = document.getElementById('prodottoId').value;
-    const nome = document.getElementById('nome').value;
-    const descrizione = document.getElementById('descrizione').value;
-    const prezzo = parseFloat(document.getElementById('prezzo').value);
-    const disponibile = document.getElementById('disponibile').checked;
-    const fotoFile = document.getElementById('foto').files[0];
+// Preview della foto selezionata
+function previewFoto(event) {
+    const file = event.target.files[0];
+    const preview = document.getElementById('fotoPreview');
     
-    console.log('=== DATI DA SALVARE ===');
-    console.log('Disponibile checkbox checked:', disponibile);
+    if (file) {
+        // Validazione file
+        if (!file.type.startsWith('image/')) {
+            showAlert('Errore: Seleziona un file immagine valido.', 'danger');
+            event.target.value = '';
+            preview.innerHTML = '';
+            return;
+        }
+        
+        if (file.size > 5 * 1024 * 1024) { // 5MB
+            showAlert('Errore: Il file è troppo grande. Massimo 5MB.', 'danger');
+            event.target.value = '';
+            preview.innerHTML = '';
+            return;
+        }
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            preview.innerHTML = `
+                <img src="${e.target.result}" 
+                     class="img-thumbnail" 
+                     style="max-width: 200px; max-height: 200px; object-fit: cover;">
+            `;
+        };
+        reader.readAsDataURL(file);
+    } else {
+        preview.innerHTML = '';
+    }
+}
+
+// Salva prodotto (nuovo o modifica)
+async function salvaProdotto(event) {
+    event.preventDefault();
     
-    if (!nome || !prezzo) {
-        showToast('Nome e prezzo sono obbligatori!', 'error');
+    if (!validateForm()) {
         return;
     }
     
-    // Mostra loading sul pulsante
-    const saveButton = document.querySelector('.modal-footer .btn-success');
-    const originalText = saveButton.innerHTML;
-    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Salvando...';
-    saveButton.disabled = true;
-    
-    // Usa FormData per supportare l'upload di file
-    const formData = new FormData();
-    formData.append('nome', nome);
-    formData.append('descrizione', descrizione);
-    formData.append('prezzo', prezzo);
-    formData.append('disponibile', disponibile);
-    
-    // Aggiungi allergeni selezionati
-    const allergeniSelezionati = Array.from(document.querySelectorAll('#allergeni-container input[type="checkbox"]:checked'))
-        .map(checkbox => checkbox.value);
-    console.log('Allergeni selezionati per il salvataggio:', allergeniSelezionati);
-    formData.append('allergeni', JSON.stringify(allergeniSelezionati));
-    
-    // Aggiungi ingredienti selezionati
-    const ingredientiSelezionati = Array.from(document.querySelectorAll('#ingredienti-container input[type="checkbox"]:checked'))
-        .map(checkbox => checkbox.value);
-    console.log('Ingredienti selezionati per il salvataggio:', ingredientiSelezionati);
-    formData.append('ingredienti', JSON.stringify(ingredientiSelezionati));
-    
-    if (fotoFile) {
-        formData.append('foto', fotoFile);
-    }
-    
-    const url = isEditing ? `/api/menu/${id}` : '/api/menu';
-    const method = isEditing ? 'PUT' : 'POST';
-    
-    fetch(url, {
-        method: method,
-        credentials: 'include',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(result => {
-        if (result.success) {
-            const modal = bootstrap.Modal.getInstance(document.getElementById('prodottoModal'));
-            modal.hide();
-            resetForm();
-            showToast(isEditing ? 'Prodotto aggiornato!' : 'Prodotto aggiunto!');
-            // Ricarica la pagina con delay ridotto
-            setTimeout(() => {
-                window.location.reload();
-            }, 500); // Ridotto da 1000ms a 500ms
-        }
-    })
-    .catch(error => {
-        console.error('Errore:', error);
-        showToast('Errore durante il salvataggio!', 'error');
-    })
-    .finally(() => {
-        // Ripristina il pulsante
-        saveButton.innerHTML = originalText;
-        saveButton.disabled = false;
-    });
-}
-
-async function editProdottoFromData(button) {
-    console.log('=== INIZIO EDIT PRODOTTO ===');
-    console.log('Button clicked:', button);
+    showLoading(true);
     
     try {
-        // Ottieni i dati dal button
-        const id = button.dataset.id;
-        const nome = button.dataset.nome;
-        const descrizione = button.dataset.descrizione;
-        const prezzo = button.dataset.prezzo;
-        const categoriaId = button.dataset.categoriaId;
-        const foto = button.dataset.foto;
-        const disponibile = button.dataset.disponibile === 'true';
-        const allergeniIds = button.dataset.allergeniIds || '';
-        const ingredientiIds = button.dataset.ingredientiIds || '';
+        const formData = new FormData(document.getElementById('prodottoForm'));
+        const prodottoId = document.getElementById('prodottoId').value;
         
-        console.log('=== DATI ESTRATTI ===');
-        console.log('ID:', id);
-        console.log('Nome:', nome);
-        console.log('Categoria ID:', categoriaId);
-        console.log('Disponibile (raw):', button.dataset.disponibile);
-        console.log('Disponibile converted to boolean:', disponibile);
-        console.log('Allergeni IDs:', allergeniIds);
-        console.log('Ingredienti IDs:', ingredientiIds);
-
-        // Carica i dati solo se non sono già stati caricati
-        await loadAllData();
-
-        // Popola i campi del form
-        document.getElementById('prodottoId').value = id;
-        document.getElementById('nome').value = nome;
-        document.getElementById('descrizione').value = descrizione;
-        document.getElementById('prezzo').value = prezzo;
-        document.getElementById('categoria').value = categoriaId || '';
+        // Aggiungi il valore della checkbox disponibile
+        formData.set('disponibile', document.getElementById('disponibile').checked);
         
-        console.log('Impostando disponibile:', disponibile);
-        const disponibileCheckbox = document.getElementById('disponibile');
-        disponibileCheckbox.checked = disponibile;
-        console.log('Checkbox disponibile impostato a:', disponibileCheckbox.checked);
-        
-        // Gestisci la foto
-        const fotoPreview = document.getElementById('foto-preview');
-        const fotoPreviewImg = document.getElementById('foto-preview-img');
-        if (foto) {
-            fotoPreviewImg.src = `/static/${foto}`;
-            fotoPreview.style.display = 'block';
+        let url, method;
+        if (isEditMode && prodottoId) {
+            url = `/api/gestione-prodotti/${prodottoId}`;
+            method = 'PUT';
         } else {
-            fotoPreview.style.display = 'none';
+            url = '/api/gestione-prodotti';
+            method = 'POST';
         }
         
-        document.getElementById('modalTitle').innerHTML = '<i class="fas fa-edit me-2"></i>Modifica Prodotto';
-        isEditing = true;
-
-        // Deseleziona tutti i checkbox prima di selezionare quelli corretti
-        document.querySelectorAll('#allergeni-container input[type="checkbox"]').forEach(cb => cb.checked = false);
-        document.querySelectorAll('#ingredienti-container input[type="checkbox"]').forEach(cb => cb.checked = false);
-
-        // Seleziona gli allergeni usando gli ID (senza delay)
-        if (allergeniIds) {
-            const allergeniIdArray = allergeniIds.split(',').map(id => id.trim());
-            console.log('Allergeni IDs to select:', allergeniIdArray);
-            
-            allergeniIdArray.forEach(allergeneId => {
-                const checkbox = document.querySelector(`#allergeni-container input[value="${allergeneId}"]`);
-                console.log(`Looking for allergene ID ${allergeneId}, found checkbox:`, checkbox);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    console.log(`Selected allergene ID ${allergeneId}`);
-                }
-            });
-        }
-
-        // Seleziona gli ingredienti usando gli ID (senza delay)
-        if (ingredientiIds) {
-            const ingredientiIdArray = ingredientiIds.split(',').map(id => id.trim());
-            console.log('Ingredienti IDs to select:', ingredientiIdArray);
-            
-            ingredientiIdArray.forEach(ingredienteId => {
-                const checkbox = document.querySelector(`#ingredienti-container input[value="${ingredienteId}"]`);
-                console.log(`Looking for ingrediente ID ${ingredienteId}, found checkbox:`, checkbox);
-                if (checkbox) {
-                    checkbox.checked = true;
-                    console.log(`Selected ingrediente ID ${ingredienteId}`);
-                }
-            });
-        }
-
-        // Mostra il modal
-        const modal = new bootstrap.Modal(document.getElementById('prodottoModal'));
-        modal.show();
-
-    } catch (error) {
-        console.error('Errore durante il caricamento dei dati per la modifica:', error);
-        showToast('Errore durante il caricamento dei dati per la modifica', 'error');
-    }
-}
-
-// Funzione ottimizzata per il salvataggio
-function saveProdotto() {
-    const id = document.getElementById('prodottoId').value;
-    const nome = document.getElementById('nome').value;
-    const descrizione = document.getElementById('descrizione').value;
-    const prezzo = parseFloat(document.getElementById('prezzo').value);
-    const categoriaId = document.getElementById('categoria').value;
-    const disponibile = document.getElementById('disponibile').checked;
-    const fotoFile = document.getElementById('foto').files[0];
-    
-    console.log('=== DATI DA SALVARE ===');
-    console.log('Disponibile checkbox checked:', disponibile);
-    
-    if (!nome || !prezzo) {
-        showToast('Nome e prezzo sono obbligatori!', 'error');
-        return;
-    }
-    
-    // Mostra loading sul pulsante
-    const saveButton = document.querySelector('.modal-footer .btn-success');
-    const originalText = saveButton.innerHTML;
-    saveButton.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Salvando...';
-    saveButton.disabled = true;
-    
-    // Usa FormData per supportare l'upload di file
-    const formData = new FormData();
-    formData.append('nome', nome);
-    formData.append('descrizione', descrizione);
-    formData.append('prezzo', prezzo);
-    if (categoriaId) {
-        formData.append('categoria_id', categoriaId);
-    }
-    formData.append('disponibile', disponibile);
-    
-    // Aggiungi allergeni selezionati
-    const allergeniSelezionati = Array.from(document.querySelectorAll('#allergeni-container input[type="checkbox"]:checked'))
-        .map(checkbox => checkbox.value);
-    console.log('Allergeni selezionati per il salvataggio:', allergeniSelezionati);
-    formData.append('allergeni', JSON.stringify(allergeniSelezionati));
-    
-    // Aggiungi ingredienti selezionati
-    const ingredientiSelezionati = Array.from(document.querySelectorAll('#ingredienti-container input[type="checkbox"]:checked'))
-        .map(checkbox => checkbox.value);
-    console.log('Ingredienti selezionati per il salvataggio:', ingredientiSelezionati);
-    formData.append('ingredienti', JSON.stringify(ingredientiSelezionati));
-    
-    if (fotoFile) {
-        formData.append('foto', fotoFile);
-    }
-    
-    const url = isEditing ? `/api/menu/${id}` : '/api/menu';
-    const method = isEditing ? 'PUT' : 'POST';
-    
-    fetch(url, {
-        method: method,
-        credentials: 'include',
-        body: formData
-    })
-    .then(response => response.json())
-    .then(result => {
+        const response = await fetch(url, {
+            method: method,
+            body: formData
+        });
+        
+        const result = await response.json();
+        
         if (result.success) {
+            showAlert(result.message, 'success');
+            
+            // Chiudi il modal
             const modal = bootstrap.Modal.getInstance(document.getElementById('prodottoModal'));
             modal.hide();
-            resetForm();
-            showToast(isEditing ? 'Prodotto aggiornato!' : 'Prodotto aggiunto!');
+            
             // Ricarica la pagina per mostrare i cambiamenti
             setTimeout(() => {
                 window.location.reload();
             }, 1000);
+        } else {
+            showAlert(result.message, 'danger');
         }
-    })
-    .catch(error => {
+    } catch (error) {
         console.error('Errore:', error);
-        showToast('Errore durante il salvataggio!', 'error');
-    });
+        showAlert('Errore durante il salvataggio del prodotto.', 'danger');
+    } finally {
+        showLoading(false);
+    }
 }
 
-function deleteProdotto(id, nome) {
-    modalConfirm.show({
-        title: 'Conferma Eliminazione Prodotto',
-        message: `Sei sicuro di voler eliminare "${nome}"?`,
-        subtext: 'Questa azione non può essere annullata.',
-        confirmText: 'Elimina',
-        confirmClass: 'btn-danger',
-        icon: 'fas fa-trash text-danger'
-    }).then(confirmed => {
-        if (confirmed) {
-            fetch(`/api/menu/${id}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
-                    showToast('Prodotto eliminato!');
-                    // Rimuovi la riga dalla tabella immediatamente
-                    const existingRow = document.querySelector(`tr[data-prodotto-id="${id}"]`);
-                    if (existingRow) {
-                        existingRow.remove();
-                    }
-                } else {
-                    showToast('Errore durante l\'eliminazione!', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Errore:', error);
-                showToast('Errore durante l\'eliminazione!', 'error');
-            });
+// Modifica prodotto
+async function modificaProdotto(prodottoId) {
+    try {
+        showLoading(true);
+        
+        // Ottieni i dati del prodotto dalle API esistenti
+        const response = await fetch('/api/prodotti');
+        const prodotti = await response.json();
+        
+        const prodotto = prodotti.find(p => p.id === prodottoId);
+        
+        if (!prodotto) {
+            showAlert('Prodotto non trovato.', 'danger');
+            return;
         }
-    });
+        
+        // Popola il form
+        document.getElementById('prodottoId').value = prodotto.id;
+        document.getElementById('nome').value = prodotto.nome;
+        document.getElementById('descrizione').value = prodotto.descrizione || '';
+        document.getElementById('prezzo').value = prodotto.prezzo;
+        document.getElementById('categoria_id').value = prodotto.categoria_id || '';
+        document.getElementById('disponibile').checked = prodotto.disponibile;
+        document.getElementById('allergeni').value = prodotto.allergeni || '';
+        document.getElementById('ingredienti').value = prodotto.ingredienti || '';
+        
+        // Mostra preview foto esistente
+        if (prodotto.foto_path) {
+            document.getElementById('fotoPreview').innerHTML = `
+                <img src="/static/uploads/${prodotto.foto_path}" 
+                     class="img-thumbnail" 
+                     style="max-width: 200px; max-height: 200px; object-fit: cover;">
+                <p class="text-muted mt-1">Foto attuale</p>
+            `;
+        }
+        
+        // Cambia il titolo del modal
+        document.getElementById('prodottoModalLabel').textContent = 'Modifica Prodotto';
+        isEditMode = true;
+        
+        // Mostra il modal
+        const modal = new bootstrap.Modal(document.getElementById('prodottoModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Errore:', error);
+        showAlert('Errore durante il caricamento del prodotto.', 'danger');
+    } finally {
+        showLoading(false);
+    }
 }
 
-function deleteProdottoFromData(button) {
-    const id = button.dataset.id;
-    const nome = button.dataset.nome;
-    
-    deleteProdotto(id, nome);
-}
-
-// Funzioni per creare righe della tabella
-function createTableRow(prodotto) {
-    const disponibileBadge = prodotto.disponibile 
-        ? '<span class="badge bg-success">Disponibile</span>' 
-        : '<span class="badge bg-danger">Non disponibile</span>';
-    
-    const nomeEscaped = (prodotto.nome || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
-    const descrizioneEscaped = (prodotto.descrizione || '').replace(/'/g, "\\'").replace(/"/g, '\\"');
-    
-    const fotoHtml = prodotto.foto 
-        ? `<img src="/static/${prodotto.foto}" alt="${prodotto.nome}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px;">`
-        : `<div class="bg-light d-flex align-items-center justify-content-center" style="width: 50px; height: 50px; border-radius: 4px;"><i class="fas fa-image text-muted"></i></div>`;
-    
-    return `
-        <tr data-prodotto-id="${prodotto.id}">
-            <td>${prodotto.id}</td>
-            <td>${fotoHtml}</td>
-            <td><strong>${prodotto.nome}</strong></td>
-            <td class="text-success"><strong>€${parseFloat(prodotto.prezzo).toFixed(2)}</strong></td>
-            <td>${disponibileBadge}</td>
-            <td>
-                <button class="btn btn-sm btn-warning me-1" 
-                        data-id="${prodotto.id}" 
-                        data-nome="${nomeEscaped}" 
-                        data-descrizione="${descrizioneEscaped}" 
-                        data-prezzo="${prodotto.prezzo}" 
-                        data-disponibile="${prodotto.disponibile}"
-                        data-foto="${prodotto.foto || ''}"
-                        data-allergeni-ids="${prodotto.allergeni_ids || ''}"
-                        data-ingredienti-ids="${prodotto.ingredienti_ids || ''}"
-                        onclick="editProdottoFromData(this)">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="btn btn-sm btn-danger" 
-                        data-id="${prodotto.id}" 
-                        data-nome="${nomeEscaped}"
-                        onclick="deleteProdottoFromData(this)">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </td>
-        </tr>
-    `;
-}
-
-// Eventi Socket.IO per aggiornamenti in tempo reale
-socket.on('prodotto_aggiunto', function(prodotto) {
-    const tbody = document.querySelector('#prodotti-table tbody');
-    tbody.insertAdjacentHTML('beforeend', createTableRow(prodotto));
-});
-
-socket.on('prodotto_aggiornato', function(prodotto) {
-    const existingRow = document.querySelector(`tr[data-prodotto-id="${prodotto.id}"]`);
-    if (existingRow) {
-        existingRow.outerHTML = createTableRow(prodotto);
-    }
-});
-
-socket.on('prodotto_eliminato', function(data) {
-    const existingRow = document.querySelector(`tr[data-prodotto-id="${data.id}"]`);
-    if (existingRow) {
-        existingRow.remove();
-    }
-});
-
-// Inizializzazione quando il DOM è pronto
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== DOM CARICATO - INIZIALIZZAZIONE ===');
-    
-    // Setup del form
-    setupFotoPreview();
-    
-    // Carica i dati iniziali
-    Promise.all([
-        loadAllergeni(), 
-        loadIngredienti()
-    ]).then(() => {
-        console.log('=== DATI INIZIALI CARICATI ===');
-        console.log('Allergeni:', allergeni.length);
-        console.log('Ingredienti:', ingredienti.length);
-    }).catch(error => {
-        console.error('Errore nel caricamento dati iniziali:', error);
-    });
-    
-    // Event listener per il form
-    const form = document.getElementById('prodottoForm');
-    if (form) {
-        console.log('=== FORM TROVATO - AGGIUNTO EVENT LISTENER ===');
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
-            console.log('=== FORM SUBMIT INTERCETTATO ===');
-            saveProdotto();
-        });
-    } else {
-        console.error('=== ERRORE: FORM NON TROVATO ===');
+// Elimina prodotto
+async function eliminaProdotto(prodottoId, nomeProdotto) {
+    if (!confirm(`Sei sicuro di voler eliminare il prodotto "${nomeProdotto}"?`)) {
+        return;
     }
     
-    // Test per verificare se i bottoni edit esistono
-    const editButtons = document.querySelectorAll('button[onclick*="editProdottoFromData"]');
-    console.log('=== BOTTONI EDIT TROVATI:', editButtons.length, '===');
-    editButtons.forEach((btn, index) => {
-        console.log(`Bottone ${index + 1}:`, btn);
-        console.log(`Data attributes:`, btn.dataset);
-    });
-    
-    // Reset form quando si chiude il modal
-    const prodottoModal = document.getElementById('prodottoModal');
-    if (prodottoModal) {
-        prodottoModal.addEventListener('hidden.bs.modal', function() {
-            resetForm();
+    try {
+        showLoading(true);
+        
+        const response = await fetch(`/api/gestione-prodotti/${prodottoId}`, {
+            method: 'DELETE'
         });
         
-        // Ricarica categorie quando si apre il modal
-        prodottoModal.addEventListener('show.bs.modal', function() {
-            loadCategorie();
-            loadAllergeni();
-            loadIngredienti();
-        });
+        const result = await response.json();
+        
+        if (result.success) {
+            showAlert(result.message, 'success');
+            
+            // Rimuovi la riga dalla tabella
+            const row = document.querySelector(`button[onclick="eliminaProdotto(${prodottoId}, '${nomeProdotto}')"]`).closest('tr');
+            row.remove();
+            
+            // Aggiorna i dati dei prodotti
+            loadProdottiData();
+        } else {
+            showAlert(result.message, 'danger');
+        }
+    } catch (error) {
+        console.error('Errore:', error);
+        showAlert('Errore durante l\'eliminazione del prodotto.', 'danger');
+    } finally {
+        showLoading(false);
     }
-});
+}
+
+// Validazione form
+function validateForm() {
+    let isValid = true;
+    
+    // Rimuovi validazioni precedenti
+    document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+    document.querySelectorAll('.invalid-feedback').forEach(el => el.remove());
+    
+    // Valida nome
+    const nome = document.getElementById('nome');
+    if (!nome.value.trim()) {
+        showFieldError(nome, 'Il nome del prodotto è obbligatorio.');
+        isValid = false;
+    }
+    
+    // Valida prezzo
+    const prezzo = document.getElementById('prezzo');
+    if (!prezzo.value || parseFloat(prezzo.value) < 0) {
+        showFieldError(prezzo, 'Inserisci un prezzo valido.');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+// Mostra errore su un campo specifico
+function showFieldError(field, message) {
+    field.classList.add('is-invalid');
+    const feedback = document.createElement('div');
+    feedback.className = 'invalid-feedback';
+    feedback.textContent = message;
+    field.parentNode.appendChild(feedback);
+}
+
+// Mostra/nascondi loading overlay
+function showLoading(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (show) {
+        overlay.classList.remove('d-none');
+        overlay.classList.add('d-flex');
+    } else {
+        overlay.classList.add('d-none');
+        overlay.classList.remove('d-flex');
+    }
+}
+
+// Mostra alert
+function showAlert(message, type = 'info') {
+    // Rimuovi alert esistenti
+    document.querySelectorAll('.alert-custom').forEach(alert => alert.remove());
+    
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show alert-custom`;
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.minWidth = '300px';
+    
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Rimuovi automaticamente dopo 5 secondi
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}

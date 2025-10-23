@@ -1,47 +1,73 @@
 {% extends "base.html" %}
 
-{% block title %}Gestione Prodotti - Gestione Ristorante{% endblock %}
+{% block title %}Gestione Prodotti{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/gestione-prodotti.css') }}">
+{% endblock %}
 
 {% block content %}
 <div class="row">
     <div class="col-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2>
-                <i class="fas fa-cogs me-2"></i>Gestione Prodotti
-            </h2>
-            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#prodottoModal">
-                <i class="fas fa-plus me-1"></i>Aggiungi Prodotto
+            <h1 class="display-6">
+                <i class="fas fa-utensils me-3" style="color: #28a745;"></i>Gestione Prodotti
+            </h1>
+            <button class="btn btn-add-product" onclick="aggiungiProdotto()">
+                <i class="fas fa-plus me-2"></i>Nuovo Prodotto
             </button>
         </div>
     </div>
 </div>
 
-<!-- Tabella prodotti -->
-<div class="row">
-    <div class="col-12">
+<div class="products-section">
+    <div class="products-header">
+        <h3 class="mb-3">
+            <i class="fas fa-search me-2"></i>Ricerca e Filtri
+        </h3>
+        <div class="row">
+            <div class="col-md-4">
+                <select id="filtroCategoria" class="form-select">
+                    <option value="">Tutte le categorie</option>
+                    {% for categoria in categorie %}
+                    <option value="{{ categoria.id }}">{{ categoria.nome }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4">
+                <select id="filtroDisponibilita" class="form-select">
+                    <option value="">Tutti</option>
+                    <option value="true">Disponibili</option>
+                    <option value="false">Non disponibili</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <input type="text" class="search-box" id="cercaProdotto" placeholder="Cerca prodotto per nome...">
+            </div>
+        </div>
+    </div>
+    <div class="products-body">
         <div class="card">
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-hover" id="prodotti-table">
+                    <table class="table table-hover" id="products-table">
                         <thead class="table-dark">
                             <tr>
-                                <th>ID</th>
                                 <th>Foto</th>
                                 <th>Nome</th>
-                                <th>Prezzo</th>
                                 <th>Categoria</th>
+                                <th>Prezzo</th>
                                 <th>Disponibile</th>
-                                <th>Azioni</th>
+                                <th width="120">Azioni</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="products-list">
                             {% for prodotto in prodotti %}
-                            <tr data-prodotto-id="{{ prodotto[0] }}">
-                                <td>{{ prodotto[0] }}</td>
+                            <tr data-categoria="{{ prodotto.categoria_id or '' }}" data-disponibile="{{ prodotto.disponibile|lower }}" data-nome="{{ prodotto.nome|lower }}">
                                 <td>
-                                    {% if prodotto[6] %}
-                                    <img src="{{ url_for('static', filename=prodotto[6]) }}" 
-                                         alt="{{ prodotto[1] }}" 
+                                    {% if prodotto.foto %}
+                                    <img src="{{ url_for('static', filename='uploads/' + prodotto.foto) }}" 
+                                         alt="{{ prodotto.nome }}" 
                                          class="img-thumbnail" 
                                          style="width: 50px; height: 50px; object-fit: cover;">
                                     {% else %}
@@ -51,174 +77,315 @@
                                     </div>
                                     {% endif %}
                                 </td>
-                                <td><strong>{{ prodotto[1] }}</strong></td>
-                                <td class="text-success"><strong>€{{ "%.2f"|format(prodotto[3]) }}</strong></td>
                                 <td>
-                                    {% if prodotto[4] %}
-                                    <span class="badge bg-primary">{{ prodotto[4] }}</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary">Nessuna categoria</span>
+                                    <strong>{{ prodotto.nome }}</strong>
+                                    {% if prodotto.descrizione %}
+                                    <br><small class="text-muted">{{ prodotto.descrizione[:50] }}{% if prodotto.descrizione|length > 50 %}...{% endif %}</small>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if prodotto[6] %}
-                                    <span class="badge bg-success">
-                                        <i class="fas fa-check me-1"></i>Sì
-                                    </span>
+                                    {% if prodotto.categoria_nome %}
+                                    <span class="badge bg-secondary">{{ prodotto.categoria_nome }}</span>
                                     {% else %}
-                                    <span class="badge bg-danger">
-                                        <i class="fas fa-times me-1"></i>No
-                                    </span>
+                                    <span class="text-muted">Nessuna categoria</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    <button class="btn btn-sm btn-warning me-1" 
-                                            data-id="{{ prodotto[0] }}" 
-                                            data-nome="{{ prodotto[1] }}" 
-                                            data-descrizione="{{ prodotto[2] or '' }}" 
-                                            data-prezzo="{{ prodotto[3] }}" 
-                                            data-categoria-id="{{ prodotto[5] or '' }}"
-                                            data-foto="{{ prodotto[7] or '' }}"
-                                            data-disponibile="{{ 'true' if prodotto[6] else 'false' }}"
-                                            data-allergeni="{{ prodotto[8] or '' }}"
-                                            data-ingredienti="{{ prodotto[9] or '' }}"
-                                            data-allergeni-ids="{{ prodotto[10] or '' }}"
-                                            data-ingredienti-ids="{{ prodotto[11] or '' }}"
-                                            onclick="editProdottoFromData(this)">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" 
-                                            data-id="{{ prodotto[0] }}" 
-                                            data-nome="{{ prodotto[1] }}"
-                                            onclick="deleteProdottoFromData(this)">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+                                    <strong>€{{ "%.2f"|format(prodotto.prezzo) }}</strong>
+                                </td>
+                                <td>
+                                    {% if prodotto.disponibile %}
+                                    <span class="badge bg-success">Disponibile</span>
+                                    {% else %}
+                                    <span class="badge bg-danger">Non disponibile</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="btn-group" role="group">
+                                        <button class="btn btn-sm btn-outline-primary" 
+                                                onclick="modificaProdotto({{ prodotto.id }})" 
+                                                title="Modifica">
+                                            <i class="fas fa-edit"></i>
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger" 
+                                                onclick="eliminaProdotto({{ prodotto.id }})" 
+                                                title="Elimina">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
-                
-                {% if not prodotti %}
-                <div class="text-center py-5">
-                    <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">Nessun prodotto presente</h4>
-                    <p class="text-muted">Inizia aggiungendo il primo prodotto al menu.</p>
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
+{% if not prodotti %}
+<div class="text-center py-5">
+    <i class="fas fa-utensils fa-3x text-muted mb-3"></i>
+    <h5 class="text-muted">Nessun prodotto trovato</h5>
+    <p class="text-muted">Inizia aggiungendo il tuo primo prodotto!</p>
+</div>
+{% endif %}
+
 <!-- Modal per aggiungere/modificare prodotto -->
-<div class="modal fade" id="prodottoModal" tabindex="-1">
-    <div class="modal-dialog">
+<div class="modal fade" id="modal-prodotto" tabindex="-1" aria-labelledby="modalProdottoLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="modalTitle">
-                    <i class="fas fa-plus me-2"></i>Aggiungi Prodotto
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                <h5 class="modal-title" id="modalProdottoLabel">Nuovo Prodotto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form id="prodottoForm" enctype="multipart/form-data">
-                    <input type="hidden" id="prodottoId" value="">
+            <form id="form-prodotto" enctype="multipart/form-data">
+                <div class="modal-body">
+                    <input type="hidden" id="prodotto-id" name="id">
                     
-                    <div class="mb-3">
-                        <label for="nome" class="form-label">Nome Prodotto *</label>
-                        <input type="text" class="form-control" id="nome" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Allergeni</label>
-                        <div id="allergeni-container" class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
-                            <!-- Checkbox caricate dinamicamente -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="prodotto-nome" class="form-label">Nome Prodotto *</label>
+                                <input type="text" class="form-control" id="prodotto-nome" name="nome" required>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label class="form-label">Ingredienti</label>
-                        <div id="ingredienti-container" class="border rounded p-2" style="max-height: 150px; overflow-y: auto;">
-                            <!-- Checkbox caricate dinamicamente -->
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="descrizione" class="form-label">Descrizione</label>
-                        <textarea class="form-control" id="descrizione" rows="3"></textarea>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="prezzo" class="form-label">Prezzo (€) *</label>
-                        <input type="number" class="form-control" id="prezzo" step="0.01" min="0" required>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="categoria" class="form-label">Categoria *</label>
-                        <div class="d-flex align-items-center">
-                            <select class="form-select me-2" id="categoria" required>
-                                <option value="">Seleziona una categoria...</option>
-                            </select>
-                            <a href="/categorie" class="btn btn-outline-primary btn-sm" target="_blank" title="Gestisci Categorie">
-                                <i class="fas fa-cog"></i>
-                            </a>
-                        </div>
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="foto" class="form-label">Foto Prodotto</label>
-                        <input type="file" class="form-control" id="foto" accept="image/*">
-                        <div class="form-text">
-                            <small>Formati supportati: PNG, JPG, JPEG, GIF, WEBP (max 16MB)</small>
-                        </div>
-                        <div id="foto-preview" class="mt-2" style="display: none;">
-                            <img id="foto-preview-img" src="" alt="Anteprima" class="img-thumbnail" style="max-width: 200px; max-height: 200px;">
-                            <div class="mt-1">
-                                <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeFotoPreview()">
-                                    <i class="fas fa-times me-1"></i>Rimuovi
-                                </button>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="prodotto-prezzo" class="form-label">Prezzo (€) *</label>
+                                <input type="number" class="form-control" id="prodotto-prezzo" name="prezzo" step="0.01" min="0" required>
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="disponibile" checked>
-                            <label class="form-check-label" for="disponibile">
-                                Prodotto disponibile
-                            </label>
+                        <label for="prodotto-descrizione" class="form-label">Descrizione</label>
+                        <textarea class="form-control" id="prodotto-descrizione" name="descrizione" rows="3"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="prodotto-categoria" class="form-label">Categoria</label>
+                                <select class="form-select" id="prodotto-categoria" name="categoria_id">
+                                    <option value="">Seleziona categoria</option>
+                                    {% for categoria in categorie %}
+                                    <option value="{{ categoria.id }}">{{ categoria.nome_completo }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <div class="form-check mt-4">
+                                    <input class="form-check-input" type="checkbox" id="prodotto-disponibile" name="disponibile" checked>
+                                    <label class="form-check-label" for="prodotto-disponibile">
+                                        Prodotto disponibile
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-                <button type="button" class="btn btn-success" onclick="saveProdotto()">
-                    <i class="fas fa-save me-1"></i>Salva
-                </button>
-            </div>
+
+                    <div class="mb-3">
+                        <label for="prodotto-foto" class="form-label">Foto Prodotto</label>
+                        <input type="file" class="form-control" id="prodotto-foto" name="foto" accept="image/*">
+                        <div class="form-text">Formati supportati: JPG, PNG, GIF (max 5MB)</div>
+                        <div id="foto-preview" class="mt-2"></div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="prodotto-allergeni" class="form-label">Allergeni</label>
+                                <select class="form-select" id="prodotto-allergeni" name="allergeni" multiple>
+                                    <!-- Popolato dinamicamente -->
+                                </select>
+                                <div class="form-text">Seleziona uno o più allergeni</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="prodotto-ingredienti" class="form-label">Ingredienti</label>
+                                <select class="form-select" id="prodotto-ingredienti" name="ingredienti" multiple>
+                                    <!-- Popolato dinamicamente -->
+                                </select>
+                                <div class="form-text">Seleziona uno o più ingredienti</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i>
+                        Salva Prodotto
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
-<!-- Toast per notifiche -->
-<div class="toast-container position-fixed bottom-0 end-0 p-3">
-    <div id="notification-toast" class="toast" role="alert">
-        <div class="toast-header">
-            <i class="fas fa-info-circle text-primary me-2"></i>
-            <strong class="me-auto">Notifica</strong>
-            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
-        </div>
-        <div class="toast-body" id="toast-message">
-            Operazione completata!
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
-{% include 'modal-confirm-include.html' %}
-<script src="{{ url_for('static', filename='js/gestione-prodotti.js') }}"></script>
-{% endblock %}
+<script>
+// Variabili globali
+let allergeniDisponibili = [];
+let ingredientiDisponibili = [];
+
+// Carica allergeni e ingredienti all'avvio
+document.addEventListener('DOMContentLoaded', function() {
+    caricaAllergeni();
+    caricaIngredienti();
+    inizializzaFiltri();
+});
+
+// Carica allergeni dal server
+async function caricaAllergeni() {
+    try {
+        const response = await fetch('/api/allergeni');
+        if (response.ok) {
+            allergeniDisponibili = await response.json();
+            popolaSelectAllergeni();
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento allergeni:', error);
+    }
+}
+
+// Carica ingredienti dal server
+async function caricaIngredienti() {
+    try {
+        const response = await fetch('/api/ingredienti');
+        if (response.ok) {
+            ingredientiDisponibili = await response.json();
+            popolaSelectIngredienti();
+        }
+    } catch (error) {
+        console.error('Errore nel caricamento ingredienti:', error);
+    }
+}
+
+// Popola select allergeni
+function popolaSelectAllergeni() {
+    const select = document.getElementById('prodotto-allergeni');
+    select.innerHTML = '';
+    allergeniDisponibili.allergeni.forEach(allergene => {
+        const option = document.createElement('option');
+        option.value = allergene.id;
+        option.textContent = allergene.nome;
+        select.appendChild(option);
+    });
+}
+
+// Popola select ingredienti
+function popolaSelectIngredienti() {
+    const select = document.getElementById('prodotto-ingredienti');
+    select.innerHTML = '';
+    ingredientiDisponibili.ingredienti.forEach(ingrediente => {
+        const option = document.createElement('option');
+        option.value = ingrediente.id;
+        option.textContent = ingrediente.nome;
+        select.appendChild(option);
+    });
+}
+
+// Funzione per aggiungere nuovo prodotto
+function aggiungiProdotto() {
+    document.getElementById('modalProdottoLabel').textContent = 'Nuovo Prodotto';
+    document.getElementById('form-prodotto').reset();
+    document.getElementById('prodotto-id').value = '';
+    document.getElementById('foto-preview').innerHTML = '';
+    const modal = new bootstrap.Modal(document.getElementById('modal-prodotto'));
+    modal.show();
+}
+
+// Funzione per modificare prodotto
+function modificaProdotto(id) {
+    // Implementare logica di modifica
+    console.log('Modifica prodotto:', id);
+}
+
+// Funzione per eliminare prodotto
+async function eliminaProdotto(id) {
+    if (confirm('Sei sicuro di voler eliminare questo prodotto?')) {
+        try {
+            const response = await fetch(`/api/gestione-prodotti/${id}`, {
+                method: 'DELETE'
+            });
+            
+            if (response.ok) {
+                location.reload();
+            } else {
+                alert('Errore durante l\'eliminazione del prodotto');
+            }
+        } catch (error) {
+            console.error('Errore:', error);
+            alert('Errore durante l\'eliminazione del prodotto');
+        }
+    }
+}
+
+// Inizializza filtri
+function inizializzaFiltri() {
+    const filtroCategoria = document.getElementById('filtroCategoria');
+    const filtroDisponibilita = document.getElementById('filtroDisponibilita');
+    const cercaProdotto = document.getElementById('cercaProdotto');
+
+    [filtroCategoria, filtroDisponibilita, cercaProdotto].forEach(elemento => {
+        elemento.addEventListener('change', filtraProdotti);
+        elemento.addEventListener('input', filtraProdotti);
+    });
+}
+
+// Filtra prodotti
+function filtraProdotti() {
+    const categoria = document.getElementById('filtroCategoria').value;
+    const disponibilita = document.getElementById('filtroDisponibilita').value;
+    const ricerca = document.getElementById('cercaProdotto').value.toLowerCase();
+    
+    const righe = document.querySelectorAll('#products-list tr');
+    
+    righe.forEach(riga => {
+        const categoriaRiga = riga.dataset.categoria;
+        const disponibileRiga = riga.dataset.disponibile;
+        const nomeRiga = riga.dataset.nome;
+        
+        let mostra = true;
+        
+        if (categoria && categoriaRiga !== categoria) mostra = false;
+        if (disponibilita && disponibileRiga !== disponibilita) mostra = false;
+        if (ricerca && !nomeRiga.includes(ricerca)) mostra = false;
+        
+        riga.style.display = mostra ? '' : 'none';
+    });
+}
+
+// Gestione form prodotto
+document.getElementById('form-prodotto').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(this);
+    const id = document.getElementById('prodotto-id').value;
+    
+    try {
+        const url = id ? `/modifica-prodotto/${id}` : '/aggiungi-prodotto';
+        const response = await fetch(url, {
+            method: 'POST',
+            body: formData
+        });
+        
+        if (response.ok) {
+            location.reload();
+        } else {
+            alert('Errore durante il salvataggio del prodotto');
+        }
+    } catch (error) {
+        console.error('Errore:', error);
+        alert('Errore durante il salvataggio del prodotto');
+    }
+});
+</script>

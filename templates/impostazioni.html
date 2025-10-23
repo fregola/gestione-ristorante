@@ -139,6 +139,10 @@
                         <label for="allergeneIcona" class="form-label">Icona (Font Awesome)</label>
                         <input type="text" class="form-control" id="allergeneIcona" placeholder="es: fas fa-wheat-awn">
                     </div>
+                    <div class="mb-3">
+                        <label for="allergeneColore" class="form-label">Colore</label>
+                        <input type="color" class="form-control form-control-color" id="allergeneColore" value="#ff6b6b">
+                    </div>
                 </form>
             </div>
             <div class="modal-footer">
@@ -184,7 +188,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- Include sistema modali personalizzate -->
-{% include 'modal-confirm-include.html' %}
 <script src="{{ url_for('static', filename='js/impostazioni.js') }}"></script>
 {% endblock %}
