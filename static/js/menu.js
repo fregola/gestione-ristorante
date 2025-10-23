@@ -10,6 +10,7 @@ if (typeof io !== 'undefined') {
 }
 
 let categorie = [];
+let categorieGenitore = [];
 let prodottiCorrente = [];
 let categorieCorrente = [];
 let categoriaGenitoreCorrente = null;
@@ -20,6 +21,152 @@ let cacheCategorie = null;
 let cacheProdotti = new Map();
 let cacheTimestamp = 0;
 const CACHE_DURATION = 30000; // 30 secondi
+
+// Sistema di gestione errori e feedback
+const ErrorManager = {
+    // Tipi di errore
+    ERROR_TYPES: {
+        NETWORK: 'network',
+        TIMEOUT: 'timeout',
+        SERVER: 'server',
+        PARSING: 'parsing',
+        UNKNOWN: 'unknown'
+    },
+
+    // Determina il tipo di errore
+    getErrorType(error) {
+        if (!navigator.onLine) return this.ERROR_TYPES.NETWORK;
+        if (error.name === 'AbortError') return this.ERROR_TYPES.TIMEOUT;
+        if (error.message.includes('HTTP error')) return this.ERROR_TYPES.SERVER;
+        if (error.message.includes('JSON')) return this.ERROR_TYPES.PARSING;
+        return this.ERROR_TYPES.UNKNOWN;
+    },
+
+    // Ottieni messaggio di errore user-friendly
+    getErrorMessage(error) {
+        const type = this.getErrorType(error);
+        const messages = {
+            [this.ERROR_TYPES.NETWORK]: 'Connessione internet non disponibile. Verifica la tua connessione.',
+            [this.ERROR_TYPES.TIMEOUT]: 'Richiesta scaduta. Il server sta impiegando troppo tempo a rispondere.',
+            [this.ERROR_TYPES.SERVER]: 'Errore del server. Riprova tra qualche minuto.',
+            [this.ERROR_TYPES.PARSING]: 'Errore nei dati ricevuti. Contatta il supporto tecnico.',
+            [this.ERROR_TYPES.UNKNOWN]: 'Si è verificato un errore imprevisto. Riprova.'
+        };
+        return messages[type] || messages[this.ERROR_TYPES.UNKNOWN];
+    },
+
+    // Mostra errore con opzioni di retry
+    showError(container, error, retryCallback = null, backCallback = null) {
+        const errorMessage = this.getErrorMessage(error);
+        const errorType = this.getErrorType(error);
+        
+        let retryButton = '';
+        if (retryCallback) {
+            retryButton = `
+                <button class="btn btn-primary me-2" onclick="(${retryCallback.toString()})()">
+                    <i class="fas fa-redo me-2"></i>Riprova
+                </button>
+            `;
+        }
+
+        let backButton = '';
+        if (backCallback) {
+            backButton = `
+                <button class="btn btn-outline-secondary" onclick="(${backCallback.toString()})()">
+                    <i class="fas fa-arrow-left me-2"></i>Torna indietro
+                </button>
+            `;
+        }
+
+        const iconClass = errorType === this.ERROR_TYPES.NETWORK ? 'fa-wifi' : 'fa-exclamation-triangle';
+        const iconColor = errorType === this.ERROR_TYPES.NETWORK ? 'text-danger' : 'text-warning';
+
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="text-center py-5">
+                    <i class="fas ${iconClass} fa-3x ${iconColor} mb-3"></i>
+                    <h4 class="text-muted">Errore nel caricamento</h4>
+                    <p class="text-muted mb-4">${errorMessage}</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        ${retryButton}
+                        ${backButton}
+                    </div>
+                    <small class="text-muted mt-3 d-block">
+                        Dettagli tecnici: ${error.message}
+                    </small>
+                </div>
+            </div>
+        `;
+    }
+};
+
+// Sistema di loading migliorato
+const LoadingManager = {
+    show(container, message = 'Caricamento in corso...', showProgress = false) {
+        let progressBar = '';
+        if (showProgress) {
+            progressBar = `
+                <div class="progress mt-3" style="width: 200px; margin: 0 auto;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                         role="progressbar" style="width: 100%"></div>
+                </div>
+            `;
+        }
+
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary mb-3" role="status">
+                        <span class="visually-hidden">Caricamento...</span>
+                    </div>
+                    <p class="text-muted mb-0">${message}</p>
+                    ${progressBar}
+                </div>
+            </div>
+        `;
+    },
+
+    showInline(element, size = 'sm') {
+        const spinnerSize = size === 'lg' ? 'spinner-border' : 'spinner-border spinner-border-sm';
+        element.innerHTML = `
+            <div class="${spinnerSize} text-primary me-2" role="status">
+                <span class="visually-hidden">Caricamento...</span>
+            </div>
+            Caricamento...
+        `;
+        element.disabled = true;
+    },
+
+    hide(element) {
+        if (element.tagName === 'BUTTON') {
+            element.disabled = false;
+        }
+    }
+};
+
+// Funzione fetch migliorata con timeout e retry
+async function fetchWithTimeout(url, options = {}, timeout = 10000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    try {
+        const response = await fetch(url, {
+            credentials: 'include',
+            ...options,
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        return response;
+    } catch (error) {
+        clearTimeout(timeoutId);
+        throw error;
+    }
+}
 
 // Funzione per controllare aggiornamenti periodicamente (solo se Socket.IO non è disponibile)
 function controllaAggiornamenti() {
@@ -169,7 +316,7 @@ function createCategoryBox(categoria) {
                         `<p class="card-text text-muted flex-grow-1">Categoria principale del menu</p>`
                     }
                     <div class="mt-auto">
-                        <button class="btn btn-outline-primary w-100" onclick="visualizzaProdottiCategoria(${categoria.id}, '${categoria.nome}')">
+                        <button class="btn btn-outline-primary w-100" onclick="visualizzaProdottiCategoria(${categoria.id}, ${JSON.stringify(categoria.nome)})">
                             <i class="fas fa-eye me-2"></i>Visualizza Prodotti
                         </button>
                     </div>
@@ -193,6 +340,7 @@ function caricaCategorie() {
     const now = Date.now();
     if (cacheCategorie && (now - cacheTimestamp) < CACHE_DURATION) {
         categorie = cacheCategorie;
+        categorieGenitore = categorie; // Assegna anche a categorieGenitore
         console.log('Categorie caricate dalla cache:', categorie);
         return Promise.resolve();
     }
@@ -200,15 +348,11 @@ function caricaCategorie() {
     caricamentoCategorieInCorso = true;
     const lang = window.languageSelector ? window.languageSelector.getCurrentLanguage() : 'it';
     
-    return fetch(`/api/categorie-menu?lang=${lang}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+    return fetchWithTimeout(`/api/categorie-menu?lang=${lang}`)
+        .then(response => response.json())
         .then(data => {
             categorie = data;
+            categorieGenitore = categorie; // Assegna anche a categorieGenitore
             // Aggiorna cache
             cacheCategorie = data;
             cacheTimestamp = now;
@@ -216,7 +360,27 @@ function caricaCategorie() {
         })
         .catch(error => {
             console.error('Errore nel caricamento delle categorie:', error);
-            showToast('Errore nel caricamento delle categorie');
+            
+            // Mostra errore user-friendly
+            const container = document.getElementById('categories-boxes-container');
+            if (container) {
+                ErrorManager.showError(
+                    container, 
+                    error, 
+                    () => {
+                        // Retry callback
+                        cacheCategorie = null;
+                        cacheTimestamp = 0;
+                        caricaCategorie().then(() => mostraCategorie());
+                    }
+                );
+            }
+            
+            // Mostra anche toast per errori meno critici
+            if (ErrorManager.getErrorType(error) !== ErrorManager.ERROR_TYPES.NETWORK) {
+                showToast('Errore nel caricamento delle categorie');
+            }
+            
             throw error; // Re-throw per permettere al chiamante di gestire l'errore
         })
         .finally(() => {
@@ -263,35 +427,79 @@ function raggruppaProdottiPerCategoria() {
 // Funzione per mostrare solo le categorie genitore
 function mostraCategorie() {
     const container = document.getElementById('categories-boxes-container');
+    const noCategoriasMessage = document.getElementById('no-categories-message');
     
-    if (!container) {
-        console.error('Container categories-boxes-container non trovato');
+    // Mostra loading durante la preparazione della vista
+    LoadingManager.show(container, 'Preparazione categorie...', false);
+    
+    // Rimuovi attributi specifici della vista prodotti
+    container.removeAttribute('data-categoria-id');
+    container.removeAttribute('data-nome-categoria');
+    container.classList.remove('category-products');
+    
+    // Filtra le categorie per mostrare solo quelle con prodotti
+    const categorieFiltrate = categorieGenitore.filter(categoria => categoria.prodotti_count > 0);
+    console.log(`Categorie totali: ${categorieGenitore.length}, Categorie con prodotti: ${categorieFiltrate.length}`);
+    
+    // Verifica se abbiamo categorie da mostrare
+    if (!categorieFiltrate || categorieFiltrate.length === 0) {
+        // Nascondi il container delle categorie e mostra il messaggio "nessuna categoria"
+        container.style.display = 'none';
+        if (noCategoriasMessage) {
+            noCategoriasMessage.style.display = 'block';
+        }
         return;
     }
     
-    if (categorie.length === 0) {
-        container.innerHTML = `
-            <div class="col-12">
-                <div class="text-center py-5">
-                    <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
-                    <h4 class="text-muted">Nessuna categoria genitore disponibile</h4>
-                    <p class="text-muted">Le categorie genitore con prodotti verranno mostrate qui.</p>
+    // Se abbiamo categorie, nascondi il messaggio "nessuna categoria" e mostra il container
+    if (noCategoriasMessage) {
+        noCategoriasMessage.style.display = 'none';
+    }
+    container.style.display = 'block';
+    
+    // Genera l'HTML per le categorie filtrate
+    let html = '<div class="row">';
+    
+    categorieFiltrate.forEach(categoria => {
+        html += `
+            <div class="col-md-6 col-lg-4 mb-4">
+                <div class="card category-card h-100 shadow-sm">
+                    <div class="card-body d-flex flex-column">
+                        <h5 class="card-title text-primary mb-3">
+                            <i class="fas fa-utensils me-2"></i>
+                            ${categoria.nome}
+                        </h5>
+                        <p class="card-text text-muted flex-grow-1">
+                            ${categoria.descrizione || 'Scopri i nostri deliziosi piatti'}
+                        </p>
+                        <button class="btn btn-primary mt-auto" 
+                                onclick="visualizzaProdottiCategoria(${categoria.id}, '${categoria.nome.replace(/'/g, "\\'")}')">
+                            <i class="fas fa-eye me-2"></i>
+                            Visualizza prodotti (${categoria.prodotti_count})
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
-        return;
-    }
+    });
     
-    // Genera l'HTML per tutte le categorie genitore
-    const categorieHtml = categorie.map(categoria => createCategoryBox(categoria)).join('');
-    container.innerHTML = categorieHtml;
+    html += '</div>';
     
-    console.log(`Visualizzate ${categorie.length} categorie genitore con prodotti`);
+    // Aggiorna il contenuto con un piccolo delay per mostrare il loading
+    setTimeout(() => {
+        container.innerHTML = html;
+        console.log(`Visualizzate ${categorieFiltrate.length} categorie con prodotti`);
+    }, 200);
 }
 
 // Funzione per inizializzare il menu con categorie genitore
 async function inizializzaMenu() {
+    const container = document.getElementById('categories-boxes-container');
+    
     try {
+        // Mostra loading durante l'inizializzazione
+        LoadingManager.show(container, 'Inizializzazione del menu...', true);
+        
         // Carica le categorie genitore
         await caricaCategorie();
         
@@ -301,7 +509,21 @@ async function inizializzaMenu() {
         console.log('Menu inizializzato con successo - solo categorie genitore popolate');
     } catch (error) {
         console.error('Errore durante l\'inizializzazione del menu:', error);
-        showToast('Errore nel caricamento del menu', 'error');
+        
+        // Mostra errore con possibilità di retry
+        ErrorManager.showError(
+            container,
+            error,
+            () => {
+                // Retry callback
+                inizializzaMenu();
+            }
+        );
+        
+        // Mostra toast per errori non di rete
+        if (ErrorManager.getErrorType(error) !== ErrorManager.ERROR_TYPES.NETWORK) {
+            showToast('Errore nel caricamento del menu', 'error');
+        }
     }
 }
 
@@ -332,7 +554,7 @@ if (socket) {
         console.log('Elemento trovato:', prodottoElement);
         
         if (prodotto.disponibile) {
-            // Se il prodotto è ora disponibile e non è visibile, aggiorna la vista
+            // Se il prodotto è ora disponibile e non è visibile - aggiorno vista
             if (!prodottoElement) {
                 console.log('Prodotto disponibile ma non visibile - aggiorno vista');
                 invalidaCacheEAggiorna();
@@ -562,32 +784,18 @@ function visualizzaProdottiCategoria(categoriaId, nomeCategoria) {
         }
     }
     
-    // Mostra loading
+    // Mostra loading migliorato
     const container = document.getElementById('categories-boxes-container');
-    container.innerHTML = `
-        <div class="col-12">
-            <div class="text-center py-4">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Caricamento...</span>
-                </div>
-                <p class="mt-3 text-muted">Caricamento prodotti di ${nomeCategoria}...</p>
-            </div>
-        </div>
-    `;
+    LoadingManager.show(container, `Caricamento prodotti di ${nomeCategoria}...`, true);
     
     // Aggiungi attributi per identificare la vista corrente
     container.setAttribute('data-categoria-id', categoriaId);
     container.setAttribute('data-nome-categoria', nomeCategoria);
     container.classList.add('category-products');
     
-    // Carica i prodotti della categoria dal server
-    fetch(`/api/prodotti/categoria/${categoriaId}?lang=${lang}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-            return response.json();
-        })
+    // Carica i prodotti della categoria dal server con timeout
+    fetchWithTimeout(`/api/prodotti/categoria/${categoriaId}?lang=${lang}`)
+        .then(response => response.json())
         .then(data => {
             prodottiCorrente = data.prodotti;
             categorieCorrente = data.categorie_figlie;
@@ -606,19 +814,25 @@ function visualizzaProdottiCategoria(categoriaId, nomeCategoria) {
         })
         .catch(error => {
             console.error('Errore nel caricamento dei prodotti:', error);
-            showToast('Errore nel caricamento dei prodotti', 'error');
             
-            container.innerHTML = `
-                <div class="col-12">
-                    <div class="text-center py-5">
-                        <i class="fas fa-exclamation-triangle fa-3x text-warning mb-3"></i>
-                        <h4 class="text-muted">Errore nel caricamento</h4>
-                        <p class="text-muted">Impossibile caricare i prodotti della categoria.</p>
-                        <button class="btn btn-primary" onclick="mostraCategorie()">
-                            <i class="fas fa-arrow-left me-2"></i>Torna alle categorie
-                        </button>
-                    </div>
-                </div>
-            `;
+            // Mostra errore con opzioni di retry e back
+            ErrorManager.showError(
+                container,
+                error,
+                () => {
+                    // Retry callback
+                    cacheProdotti.delete(cacheKey);
+                    visualizzaProdottiCategoria(categoriaId, nomeCategoria);
+                },
+                () => {
+                    // Back callback
+                    mostraCategorie();
+                }
+            );
+            
+            // Mostra toast solo per errori non di rete
+            if (ErrorManager.getErrorType(error) !== ErrorManager.ERROR_TYPES.NETWORK) {
+                showToast('Errore nel caricamento dei prodotti', 'error');
+            }
         });
 }

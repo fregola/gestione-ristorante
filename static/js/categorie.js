@@ -20,7 +20,7 @@ socket.on('categoria_aggiornata', function(data) {
 });
 
 function caricaCategorie() {
-    fetch('/api/categorie')
+    fetch('/api/categorie', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             categorie = data.categorie;
@@ -241,7 +241,7 @@ function salvaCategoria() {
         descrizione: document.getElementById('categoriaDescrizione').value.trim()
     };
     
-    if (!nome.trim()) {
+    if (!data.nome.trim()) {
         modalConfirm.show({
             title: 'Campo Obbligatorio',
             message: 'Il nome della categoria è obbligatorio',
@@ -260,9 +260,15 @@ function salvaCategoria() {
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
         body: JSON.stringify(data)
     })
-    .then(response => response.json())
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return response.json();
+    })
     .then(result => {
         if (result.success) {
             bootstrap.Modal.getInstance(document.getElementById('categoriaModal')).hide();
@@ -316,7 +322,7 @@ function eliminaCategoria(id) {
         icon: 'fas fa-trash text-danger'
     }).then(confirmed => {
         if (confirmed) {
-            fetch(`/api/categorie/${id}`, {method: 'DELETE'})
+            fetch(`/api/categorie/${id}`, {method: 'DELETE', credentials: 'include'})
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => Promise.reject(err));

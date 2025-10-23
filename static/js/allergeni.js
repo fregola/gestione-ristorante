@@ -26,7 +26,7 @@ socket.on('allergene_aggiornato', function(data) {
 });
 
 function caricaAllergeni() {
-    fetch('/api/allergeni')
+    fetch('/api/allergeni', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             allergeni = data.allergeni;
@@ -134,7 +134,7 @@ function salvaAllergene() {
         icona: document.getElementById('allergeneIcona').value
     };
     
-    if (!nome.trim()) {
+    if (!data.nome.trim()) {
         modalConfirm.show({
             title: 'Campo Obbligatorio',
             message: 'Il nome dell\'allergene è obbligatorio',
@@ -153,6 +153,7 @@ function salvaAllergene() {
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
@@ -199,7 +200,7 @@ function eliminaAllergene(id) {
         icon: 'fas fa-exclamation-triangle text-danger'
     }).then(confirmed => {
         if (confirmed) {
-            fetch(`/api/allergeni/${id}`, {method: 'DELETE'})
+            fetch(`/api/allergeni/${id}`, {method: 'DELETE', credentials: 'include'})
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {

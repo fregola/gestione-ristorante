@@ -30,7 +30,7 @@ function loadCategorie() {
         return Promise.resolve(); // Usa cache se già caricate
     }
     
-    return fetch('/api/categorie')
+    return fetch('/api/categorie', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             // L'API restituisce {categorie: [...]}
@@ -38,19 +38,44 @@ function loadCategorie() {
             const categoriaSelect = document.getElementById('categoria');
             categoriaSelect.innerHTML = '<option value="">Seleziona categoria</option>';
             
-            // Aggiungi tutte le categorie al select
+            // Raggruppa le categorie per genitore
+            const categorieGenitore = [];
+            const categorieFiglie = {};
+            
             categorie.forEach(categoria => {
-                const option = document.createElement('option');
-                option.value = categoria.id;
-                
-                // Se la categoria ha un parent, mostra concatenata, altrimenti normale
-                if (categoria.parent_nome) {
-                    option.textContent = `${categoria.parent_nome} > ${categoria.nome}`;
+                if (categoria.parent_id === null) {
+                    // È una categoria genitore
+                    categorieGenitore.push(categoria);
+                    categorieFiglie[categoria.id] = [];
                 } else {
-                    option.textContent = categoria.nome;
+                    // È una categoria figlia
+                    if (!categorieFiglie[categoria.parent_id]) {
+                        categorieFiglie[categoria.parent_id] = [];
+                    }
+                    categorieFiglie[categoria.parent_id].push(categoria);
                 }
+            });
+            
+            // Aggiungi le categorie al select in modo gerarchico
+            categorieGenitore.forEach(genitore => {
+                // Aggiungi la categoria genitore
+                const optionGenitore = document.createElement('option');
+                optionGenitore.value = genitore.id;
+                optionGenitore.textContent = genitore.nome;
+                optionGenitore.style.fontWeight = 'bold';
+                categoriaSelect.appendChild(optionGenitore);
                 
-                categoriaSelect.appendChild(option);
+                // Aggiungi le categorie figlie se esistono
+                if (categorieFiglie[genitore.id] && categorieFiglie[genitore.id].length > 0) {
+                    categorieFiglie[genitore.id].forEach(figlia => {
+                        const optionFiglia = document.createElement('option');
+                        optionFiglia.value = figlia.id;
+                        optionFiglia.textContent = `    ↳ ${figlia.nome}`;
+                        optionFiglia.style.paddingLeft = '20px';
+                        optionFiglia.style.color = '#6c757d';
+                        categoriaSelect.appendChild(optionFiglia);
+                    });
+                }
             });
         })
         .catch(error => {
@@ -65,7 +90,7 @@ function loadAllergeni() {
         return Promise.resolve(); // Usa cache se già caricati
     }
     
-    return fetch('/api/allergeni')
+    return fetch('/api/allergeni', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             allergeni = data.allergeni || [];
@@ -104,7 +129,7 @@ function loadIngredienti() {
         return Promise.resolve(); // Usa cache se già caricati
     }
     
-    return fetch('/api/ingredienti')
+    return fetch('/api/ingredienti', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             ingredienti = data.ingredienti || [];
@@ -252,6 +277,7 @@ function saveProdotto() {
     
     fetch(url, {
         method: method,
+        credentials: 'include',
         body: formData
     })
     .then(response => response.json())
@@ -502,6 +528,7 @@ function saveProdotto() {
     
     fetch(url, {
         method: method,
+        credentials: 'include',
         body: formData
     })
     .then(response => response.json())
@@ -534,7 +561,8 @@ function deleteProdotto(id, nome) {
     }).then(confirmed => {
         if (confirmed) {
             fetch(`/api/menu/${id}`, {
-                method: 'DELETE'
+                method: 'DELETE',
+                credentials: 'include'
             })
             .then(response => response.json())
             .then(result => {

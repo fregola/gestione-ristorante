@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Funzione per caricare i dati azienda
 async function caricaDatiAzienda() {
     try {
-        const response = await fetch('/api/dati-azienda');
+        const response = await fetch('/api/dati-azienda', {credentials: 'include'})
         const data = await response.json();
         
         if (response.ok) {
@@ -97,6 +97,7 @@ async function salvaDatiAzienda() {
             headers: {
                 'Content-Type': 'application/json',
             },
+            credentials: 'include',
             body: JSON.stringify({
                 nome_attivita: formData.get('nome_attivita'),
                 indirizzo: formData.get('indirizzo'),
@@ -124,6 +125,7 @@ async function salvaDatiAzienda() {
             
             const logoResponse = await fetch('/api/upload-logo', {
                 method: 'POST',
+                credentials: 'include',
                 body: logoFormData
             });
             

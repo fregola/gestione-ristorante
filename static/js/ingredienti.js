@@ -24,7 +24,7 @@ socket.on('ingrediente_aggiornato', function(data) {
 });
 
 function caricaIngredienti() {
-    fetch('/api/ingredienti')
+    fetch('/api/ingredienti', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             ingredienti = data.ingredienti;
@@ -126,7 +126,7 @@ function salvaIngrediente() {
         icona: document.getElementById('ingredienteIcona').value
     };
     
-    if (!nome.trim()) {
+    if (!data.nome.trim()) {
         modalConfirm.show({
             title: 'Campo Obbligatorio',
             message: 'Il nome dell\'ingrediente è obbligatorio',
@@ -145,6 +145,7 @@ function salvaIngrediente() {
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
@@ -191,7 +192,7 @@ function eliminaIngrediente(id) {
         icon: 'fas fa-trash text-danger'
     }).then(confirmed => {
         if (confirmed) {
-            fetch(`/api/ingredienti/${id}`, {method: 'DELETE'})
+            fetch(`/api/ingredienti/${id}`, {method: 'DELETE', credentials: 'include'})
                 .then(response => response.json())
                 .then(result => {
                     if (result.success) {

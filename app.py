@@ -11,6 +11,9 @@ import time
 import requests
 import json
 
+# Importa il nuovo servizio di traduzione
+from translation_service import translation_service
+
 # Variabile globale per tracciare l'ultimo aggiornamento
 ultimo_aggiornamento = int(time.time() * 1000)
 
@@ -29,162 +32,13 @@ login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'Devi effettuare il login per accedere a questa pagina.'
 
-# Funzione di traduzione semplificata - DISABILITATA
+# Funzione di traduzione migliorata con Google Translate
 def traduci_testo(testo, lingua_destinazione='en'):
     """
-    Funzione di traduzione semplice per allergeni, categorie e ingredienti comuni.
+    Funzione di traduzione che utilizza il nuovo servizio Google Translate
+    con fallback al dizionario locale per compatibilità
     """
-    if lingua_destinazione != 'en':
-        return testo
-    
-    # Dizionario di traduzioni per allergeni comuni
-    traduzioni_allergeni = {
-        'glutine': 'gluten',
-        'lattosio': 'lactose',
-        'uova': 'eggs',
-        'pesce': 'fish',
-        'crostacei': 'crustaceans',
-        'frutta a guscio': 'nuts',
-        'soia': 'soy',
-        'sedano': 'celery',
-        'senape': 'mustard',
-        'sesamo': 'sesame',
-        'anidride solforosa': 'sulfur dioxide',
-        'lupini': 'lupin',
-        'molluschi': 'molluscs',
-        'arachidi': 'peanuts'
-    }
-    
-    # Dizionario di traduzioni per categorie comuni
-    traduzioni_categorie = {
-        'antipasti': 'appetizers',
-        'primi piatti': 'first courses',
-        'secondi piatti': 'main courses',
-        'contorni': 'side dishes',
-        'dolci': 'desserts',
-        'bevande': 'beverages',
-        'vini': 'wines',
-        'birre': 'beers',
-        'cocktail': 'cocktails',
-        'caffetteria': 'coffee shop',
-        'pizza': 'pizza',
-        'pasta': 'pasta',
-        'carne': 'meat',
-        'pesce': 'fish',
-        'vegetariano': 'vegetarian',
-        'vegano': 'vegan',
-        'vegetariani': 'vegetarian',
-        'nuovo': 'new',
-        'nuova': 'new',
-        'nuovi': 'new',
-        'nuove': 'new',
-        'gioco': 'game',
-        'giochi': 'games',
-        'sport': 'sports',
-        'fitness': 'fitness',
-        'salute': 'health',
-        'benessere': 'wellness',
-        'tradizionale': 'traditional',
-        'moderno': 'modern',
-        'classico': 'classic',
-        'speciale': 'special',
-        'speciali': 'special',
-        'gourmet': 'gourmet',
-        'fusion': 'fusion',
-        'etnico': 'ethnic',
-        'internazionale': 'international',
-        'regionale': 'regional',
-        'stagionale': 'seasonal',
-        'fresco': 'fresh',
-        'biologico': 'organic',
-        'naturale': 'natural',
-        'light': 'light',
-        'dietetico': 'diet',
-        'senza glutine': 'gluten-free',
-        'senza lattosio': 'lactose-free'
-    }
-    
-    # Dizionario di traduzioni per ingredienti comuni
-    traduzioni_ingredienti = {
-        'pomodoro': 'tomato',
-        'mozzarella': 'mozzarella',
-        'basilico': 'basil',
-        'olio': 'oil',
-        'aglio': 'garlic',
-        'cipolla': 'onion',
-        'peperoni': 'peppers',
-        'funghi': 'mushrooms',
-        'prosciutto': 'ham',
-        'salame': 'salami',
-        'tonno': 'tuna',
-        'salmone': 'salmon',
-        'gamberi': 'shrimp',
-        'parmigiano': 'parmesan',
-        'gorgonzola': 'gorgonzola',
-        'ricotta': 'ricotta',
-        'spinaci': 'spinach',
-        'rucola': 'arugula',
-        'olive': 'olives',
-        'capperi': 'capers',
-        'pancetta': 'bacon',
-        'guanciale': 'guanciale',
-        'pecorino': 'pecorino',
-        'burrata': 'burrata',
-        'bresaola': 'bresaola',
-        'speck': 'speck',
-        'mortadella': 'mortadella',
-        'zucchine': 'zucchini',
-        'melanzane': 'eggplant',
-        'peperoncino': 'chili pepper',
-        'uova': 'eggs',
-        'spaghetti': 'spaghetti',
-        'mascarpone': 'mascarpone',
-        'caffè': 'coffee'
-    }
-    
-    # Cerca traduzione esatta (case insensitive)
-    testo_lower = testo.lower().strip()
-    
-    # Controlla prima gli allergeni
-    if testo_lower in traduzioni_allergeni:
-        return traduzioni_allergeni[testo_lower]
-    
-    # Poi le categorie
-    if testo_lower in traduzioni_categorie:
-        return traduzioni_categorie[testo_lower]
-    
-    # Infine gli ingredienti
-    if testo_lower in traduzioni_ingredienti:
-        return traduzioni_ingredienti[testo_lower]
-    
-    # Traduzioni di fallback per parole comuni
-    traduzioni_fallback = {
-        'nuovo': 'new',
-        'nuova': 'new',
-        'nuovi': 'new',
-        'nuove': 'new',
-        'categoria': 'category',
-        'prodotto': 'product',
-        'prodotti': 'products',
-        'menu': 'menu',
-        'lista': 'list',
-        'altro': 'other',
-        'vario': 'various',
-        'vari': 'various',
-        'varie': 'various',
-        'misto': 'mixed',
-        'mista': 'mixed',
-        'assortito': 'assorted',
-        'selezione': 'selection',
-        'collezione': 'collection'
-    }
-    
-    # Controlla le traduzioni di fallback
-    if testo_lower in traduzioni_fallback:
-        return traduzioni_fallback[testo_lower]
-    
-    # Se non trova traduzione, ritorna il testo originale
-    return testo
+    return translation_service.translate_text(testo, lingua_destinazione)
 
 # Funzione per salvare le traduzioni di un elemento - DISABILITATA per semplificare il database
 def salva_traduzioni(tabella, elemento_id, nome_it, descrizione_it=None):
@@ -629,13 +483,24 @@ def aggiungi_prodotto():
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     
-    # Inserisci il prodotto
+    # Inserisci il prodotto con traduzioni automatiche
     cursor.execute('''
         INSERT INTO prodotti (nome, descrizione, prezzo, categoria_id, foto, disponibile) 
         VALUES (?, ?, ?, ?, ?, ?)
     ''', (nome, descrizione, prezzo, categoria_id, foto_path, disponibile))
     
     prodotto_id = cursor.lastrowid
+    
+    # Chiudi la connessione temporaneamente per usare il servizio di traduzione
+    conn.commit()
+    conn.close()
+    
+    # Traduci e salva automaticamente nel database
+    translation_service.translate_and_save_product(prodotto_id, nome, descrizione)
+    
+    # Riapri la connessione per le associazioni
+    conn = sqlite3.connect('ristorante.db')
+    cursor = conn.cursor()
     
     # Inserisci associazioni con allergeni
     for allergene_id in allergeni_ids:
@@ -757,12 +622,23 @@ def aggiorna_prodotto(prodotto_id):
     cursor = conn.cursor()
     
     try:
-        # Aggiorna il prodotto
+        # Aggiorna il prodotto con traduzioni automatiche
         cursor.execute('''
             UPDATE prodotti 
             SET nome = ?, descrizione = ?, prezzo = ?, categoria_id = ?, foto = ?, disponibile = ?, updated_at = CURRENT_TIMESTAMP
             WHERE id = ?
         ''', (nome, descrizione, prezzo, categoria_id, foto_path, disponibile, prodotto_id))
+        
+        # Chiudi la connessione temporaneamente per usare il servizio di traduzione
+        conn.commit()
+        conn.close()
+        
+        # Traduci e salva automaticamente nel database
+        translation_service.translate_and_save_product(prodotto_id, nome, descrizione)
+        
+        # Riapri la connessione per le associazioni
+        conn = sqlite3.connect('ristorante.db')
+        cursor = conn.cursor()
         
         # Rimuovi associazioni esistenti in batch
         cursor.execute('DELETE FROM prodotti_allergeni WHERE prodotto_id = ?', (prodotto_id,))
@@ -1036,23 +912,32 @@ def get_categorie():
 @app.route('/api/categorie', methods=['POST'])
 @login_required
 def aggiungi_categoria():
-    data = request.get_json()
-    
-    # Traduzione automatica del nome in inglese
-    nome_en = traduci_testo(data['nome'])
-    
-    conn = sqlite3.connect('ristorante.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        INSERT INTO categorie (nome, parent_id, descrizione, ordine, nome_en) 
-        VALUES (?, ?, ?, ?, ?)
-    ''', (data['nome'], data.get('parent_id'), data.get('descrizione', ''), data.get('ordine', 0), nome_en))
-    
-    categoria_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    return {'success': True, 'id': categoria_id}
+    try:
+        data = request.get_json()
+        
+        conn = sqlite3.connect('ristorante.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO categorie (nome, parent_id, descrizione, ordine) 
+            VALUES (?, ?, ?, ?)
+        ''', (data['nome'], data.get('parent_id'), data.get('descrizione', ''), data.get('ordine', 0)))
+        
+        categoria_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        
+        # Traduci e salva automaticamente nel database
+        try:
+            translation_service.translate_and_save_category(categoria_id, data['nome'], data.get('descrizione'))
+            print(f"Traduzione salvata per categoria {categoria_id}: {data['nome']} - {data.get('descrizione', 'Nessuna descrizione')}")
+        except Exception as e:
+            print(f"Errore nella traduzione categoria {categoria_id}: {e}")
+            # Continua comunque, la categoria è stata creata
+        
+        return {'success': True, 'id': categoria_id}
+    except Exception as e:
+        print(f"Errore nell'aggiunta categoria: {e}")
+        return {'success': False, 'error': str(e)}, 500
 
 # Funzione duplicata rimossa - mantenuta solo la prima definizione
 
@@ -1093,26 +978,35 @@ def elimina_categoria(categoria_id):
 @app.route('/api/categorie/<int:categoria_id>', methods=['PUT'])
 @login_required
 def aggiorna_categoria(categoria_id):
-    data = request.get_json()
-    
-    # Traduzione automatica del nome in inglese
-    nome_en = traduci_testo(data['nome'])
-    
-    conn = sqlite3.connect('ristorante.db')
-    cursor = conn.cursor()
-    cursor.execute('''
-        UPDATE categorie 
-        SET nome = ?, parent_id = ?, descrizione = ?, ordine = ?, nome_en = ?
-        WHERE id = ?
-    ''', (data['nome'], data.get('parent_id'), data.get('descrizione', ''), data.get('ordine', 0), nome_en, categoria_id))
-    
-    conn.commit()
-    conn.close()
-    
-    # Emetti evento SocketIO per aggiornamento real-time
-    socketio.emit('categoria_aggiornata', {'id': categoria_id, 'data': data})
-    
-    return {'success': True}
+    try:
+        data = request.get_json()
+        
+        conn = sqlite3.connect('ristorante.db')
+        cursor = conn.cursor()
+        cursor.execute('''
+            UPDATE categorie 
+            SET nome = ?, parent_id = ?, descrizione = ?, ordine = ?
+            WHERE id = ?
+        ''', (data['nome'], data.get('parent_id'), data.get('descrizione', ''), data.get('ordine', 0), categoria_id))
+        
+        conn.commit()
+        conn.close()
+        
+        # Traduci e salva automaticamente nel database
+        try:
+            translation_service.translate_and_save_category(categoria_id, data['nome'], data.get('descrizione'))
+            print(f"Traduzione aggiornata per categoria {categoria_id}: {data['nome']} - {data.get('descrizione', 'Nessuna descrizione')}")
+        except Exception as e:
+            print(f"Errore nella traduzione categoria {categoria_id}: {e}")
+            # Continua comunque, la categoria è stata aggiornata
+        
+        # Emetti evento SocketIO per aggiornamento real-time
+        socketio.emit('categoria_aggiornata', {'id': categoria_id, 'data': data})
+        
+        return {'success': True}
+    except Exception as e:
+        print(f"Errore nell'aggiornamento categoria: {e}")
+        return {'success': False, 'error': str(e)}, 500
 
 # Funzione duplicata rimossa - mantenuta solo la prima definizione
 
@@ -1143,19 +1037,19 @@ def get_allergeni():
 def aggiungi_allergene():
     data = request.get_json()
     
-    # Genera automaticamente la traduzione inglese
-    nome_en = traduci_testo(data['nome'], 'en')
-    
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO allergeni (nome, icona, nome_en) 
-        VALUES (?, ?, ?)
-    ''', (data['nome'], data.get('icona', ''), nome_en))
+        INSERT INTO allergeni (nome, icona, codice, descrizione, created_at) 
+        VALUES (?, ?, ?, ?, datetime('now'))
+    ''', (data['nome'], data.get('icona', ''), data.get('codice', ''), data.get('descrizione', '')))
     
     allergene_id = cursor.lastrowid
     conn.commit()
     conn.close()
+    
+    # Traduci e salva automaticamente nel database
+    translation_service.translate_and_save_allergen(allergene_id, data['nome'], data.get('descrizione', ''))
     
     return {'success': True, 'id': allergene_id}
 
@@ -1164,19 +1058,19 @@ def aggiungi_allergene():
 def aggiorna_allergene(allergene_id):
     data = request.get_json()
     
-    # Genera automaticamente la traduzione inglese
-    nome_en = traduci_testo(data['nome'], 'en')
-    
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE allergeni 
-        SET nome = ?, icona = ?, nome_en = ?
+        SET nome = ?, icona = ?, descrizione = ?
         WHERE id = ?
-    ''', (data['nome'], data.get('icona', ''), nome_en, allergene_id))
+    ''', (data['nome'], data.get('icona', ''), data.get('descrizione', ''), allergene_id))
     
     conn.commit()
     conn.close()
+    
+    # Traduci e salva automaticamente nel database
+    translation_service.translate_and_save_allergen(allergene_id, data['nome'], data.get('descrizione', ''))
     
     # Emetti evento SocketIO per aggiornamento real-time
     socketio.emit('allergene_aggiornato', {'id': allergene_id, 'data': data})
@@ -1233,19 +1127,19 @@ def get_ingredienti():
 def aggiungi_ingrediente():
     data = request.get_json()
     
-    # Traduzione automatica del nome in inglese
-    nome_en = traduci_testo(data['nome'])
-    
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     cursor.execute('''
-        INSERT INTO ingredienti (nome, icona, nome_en)
+        INSERT INTO ingredienti (nome, icona, descrizione) 
         VALUES (?, ?, ?)
-        ''', (data['nome'], data.get('icona', ''), nome_en))
+    ''', (data['nome'], data.get('icona', ''), data.get('descrizione', '')))
     
     ingrediente_id = cursor.lastrowid
     conn.commit()
     conn.close()
+    
+    # Traduci e salva automaticamente nel database
+    translation_service.translate_and_save_ingredient(ingrediente_id, data['nome'], data.get('descrizione', ''))
     
     return {'success': True, 'id': ingrediente_id}
 
@@ -1254,19 +1148,19 @@ def aggiungi_ingrediente():
 def aggiorna_ingrediente(ingrediente_id):
     data = request.get_json()
     
-    # Traduzione automatica del nome in inglese
-    nome_en = traduci_testo(data['nome'])
-    
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE ingredienti 
-        SET nome = ?, icona = ?, nome_en = ?
+        SET nome = ?, icona = ?, descrizione = ?
         WHERE id = ?
-        ''', (data['nome'], data.get('icona', ''), nome_en, ingrediente_id))
+        ''', (data['nome'], data.get('icona', ''), data.get('descrizione', ''), ingrediente_id))
     
     conn.commit()
     conn.close()
+    
+    # Traduci e salva automaticamente nel database
+    translation_service.translate_and_save_ingredient(ingrediente_id, data['nome'], data.get('descrizione', ''))
     
     # Emetti evento SocketIO per aggiornamento real-time
     socketio.emit('ingrediente_aggiornato', {'id': ingrediente_id, 'data': data})
@@ -1344,49 +1238,46 @@ def get_prodotti_categoria(categoria_id):
                    WHEN c.parent_id IS NOT NULL THEN parent.nome
                    ELSE NULL
                END as categoria_genitore_nome,
-               GROUP_CONCAT(DISTINCT a.id || '|' || a.nome || '|' || COALESCE(a.icona, '') || '|' || COALESCE(a.colore, '#6c757d')) as allergeni_data,
-               GROUP_CONCAT(DISTINCT i.id || '|' || i.nome) as ingredienti_data
+               GROUP_CONCAT(DISTINCT a.id || '|' || COALESCE(CASE WHEN ? = 'en' THEN a.nome_en ELSE a.nome END, a.nome) || '|' || COALESCE(a.icona, '')) as allergeni_data,
+               GROUP_CONCAT(DISTINCT i.id || '|' || COALESCE(CASE WHEN ? = 'en' THEN i.nome_en ELSE i.nome END, i.nome)) as ingredienti_data,
+               COALESCE(CASE WHEN ? = 'en' THEN p.nome_en ELSE p.nome END, p.nome) as nome_tradotto,
+               COALESCE(CASE WHEN ? = 'en' THEN p.descrizione_en ELSE p.descrizione END, p.descrizione) as descrizione_tradotta,
+               COALESCE(CASE WHEN ? = 'en' THEN c.nome_en ELSE c.nome END, c.nome) as categoria_nome_tradotta
         FROM prodotti p
         LEFT JOIN categorie c ON p.categoria_id = c.id
         LEFT JOIN categorie parent ON c.parent_id = parent.id
         LEFT JOIN prodotti_allergeni pa ON p.id = pa.prodotto_id
-        LEFT JOIN allergeni a ON pa.allergene_id = a.id AND a.attivo = 1
+        LEFT JOIN allergeni a ON pa.allergene_id = a.id
         LEFT JOIN prodotti_ingredienti pi ON p.id = pi.prodotto_id
-        LEFT JOIN ingredienti i ON pi.ingrediente_id = i.id AND i.attivo = 1
+        LEFT JOIN ingredienti i ON pi.ingrediente_id = i.id
         WHERE p.attivo = 1 AND p.disponibile = 1
         AND (p.categoria_id = ? OR c.parent_id = ?)
         GROUP BY p.id, p.nome, p.descrizione, p.prezzo, p.categoria_id, p.disponibile, 
                  p.foto, p.updated_at, c.nome, c.parent_id, categoria_genitore_nome
         ORDER BY c.nome, p.nome
-    ''', (categoria_id, categoria_id))
+    ''', (lingua, lingua, lingua, lingua, lingua, categoria_id, categoria_id))
     
     prodotti = []
     categorie_figlie = set()
     
     for row in cursor.fetchall():
         prodotto_id = row[0]
-        nome_originale = row[1]
-        descrizione_originale = row[2]
-        
-        # Traduzioni disabilitate - usa sempre il testo originale
-        nome_tradotto = nome_originale
-        descrizione_tradotta = descrizione_originale
+        nome_tradotto = row[13]  # nome_tradotto dalla query
+        descrizione_tradotta = row[14]  # descrizione_tradotta dalla query
+        categoria_nome_tradotta = row[15]  # categoria_nome_tradotta dalla query
         
         # Parse allergeni dalla stringa concatenata
         allergeni_list = []
         if row[11]:  # allergeni_data
             for allergene_str in row[11].split(','):
                 parts = allergene_str.split('|')
-                if len(parts) >= 4:
-                    allergene_id, nome_allergene, icona, colore = parts[0], parts[1], parts[2], parts[3]
-                    
-                    # Traduzioni disabilitate - usa sempre il nome originale
-                    # nome_allergene rimane invariato
+                if len(parts) >= 3:
+                    allergene_id, nome_allergene, icona = parts[0], parts[1], parts[2]
                     
                     allergeni_list.append({
                         'nome': nome_allergene,
                         'icona': icona or '',
-                        'colore': colore or '#6c757d'
+                        'colore': '#6c757d'
                     })
         
         # Parse ingredienti dalla stringa concatenata
@@ -1396,9 +1287,6 @@ def get_prodotti_categoria(categoria_id):
                 parts = ingrediente_str.split('|')
                 if len(parts) >= 2:
                     ingrediente_id, nome_ingrediente = parts[0], parts[1]
-                    
-                    # Traduzioni disabilitate - usa sempre il nome originale
-                    # nome_ingrediente rimane invariato
                     
                     ingredienti_list.append(nome_ingrediente)
         
@@ -1411,7 +1299,7 @@ def get_prodotti_categoria(categoria_id):
             'disponibile': bool(row[5]),
             'foto': row[6],
             'ultimo_aggiornamento': row[7],
-            'categoria_nome': row[8],
+            'categoria_nome': categoria_nome_tradotta,
             'categoria_genitore_nome': row[10],
             'allergeni': allergeni_list,
             'ingredienti': ingredienti_list
@@ -1419,15 +1307,22 @@ def get_prodotti_categoria(categoria_id):
         
         # Se il prodotto appartiene a una categoria figlia, aggiungi la categoria alla lista
         if row[9] == categoria_id:  # parent_id == categoria_id
-            categorie_figlie.add(row[8])  # categoria_nome
+            categorie_figlie.add(categoria_nome_tradotta)  # categoria_nome_tradotta
     
     # Ottieni informazioni sulla categoria genitore con traduzione
-    cursor.execute('SELECT nome, descrizione FROM categorie WHERE id = ?', (categoria_id,))
+    cursor.execute('SELECT nome, descrizione, nome_en FROM categorie WHERE id = ?', (categoria_id,))
     categoria_info = cursor.fetchone()
     
-    # Traduzioni disabilitate - usa sempre il testo originale
-    categoria_nome = categoria_info[0] if categoria_info else ''
-    categoria_descrizione = categoria_info[1] if categoria_info else ''
+    # Usa la traduzione se disponibile e richiesta
+    if categoria_info:
+        if lingua == 'en' and categoria_info[2]:
+            categoria_nome = categoria_info[2]  # nome_en
+        else:
+            categoria_nome = categoria_info[0]  # nome
+        categoria_descrizione = categoria_info[1]  # descrizione (per ora solo italiano)
+    else:
+        categoria_nome = ''
+        categoria_descrizione = ''
     
     conn.close()
     
@@ -1450,9 +1345,11 @@ def get_categorie_menu():
     conn = sqlite3.connect('ristorante.db')
     cursor = conn.cursor()
     
-    # Query ottimizzata con JOIN per eliminare il problema N+1
+    # Prima eseguiamo la query senza filtro per debug
     cursor.execute('''
-        SELECT c.id, c.nome, c.descrizione, 
+        SELECT c.id, 
+               COALESCE(CASE WHEN ? = 'en' THEN c.nome_en ELSE c.nome END, c.nome) as nome_tradotto,
+               COALESCE(CASE WHEN ? = 'en' THEN c.descrizione_en ELSE c.descrizione END, c.descrizione) as descrizione_tradotta,
                COALESCE(COUNT(DISTINCT p.id), 0) as prodotti_count
         FROM categorie c
         LEFT JOIN categorie c_figlio ON c_figlio.parent_id = c.id
@@ -1461,28 +1358,34 @@ def get_categorie_menu():
         WHERE c.parent_id IS NULL 
         AND c.attiva = 1
         GROUP BY c.id, c.nome, c.descrizione
-        HAVING prodotti_count > 0
         ORDER BY c.nome
-    ''')
+    ''', (lingua, lingua))
     
     categorie = []
-    for row in cursor.fetchall():
+    all_rows = cursor.fetchall()
+    print(f"DEBUG: Query ha restituito {len(all_rows)} righe totali")
+    
+    for row in all_rows:
         categoria_id = row[0]
-        nome_originale = row[1]
-        descrizione_originale = row[2]
+        nome_tradotto = row[1]
+        descrizione_tradotta = row[2]
         prodotti_count = row[3]
         
-        # Traduzioni disabilitate - usa sempre il testo originale
-        nome_tradotto = nome_originale
-        descrizione_tradotta = descrizione_originale
+        print(f"DEBUG: Categoria {nome_tradotto}, prodotti_count: {prodotti_count}")
         
-        categorie.append({
-            'id': categoria_id,
-            'nome': nome_tradotto,
-            'descrizione': descrizione_tradotta,
-            'prodotti_count': prodotti_count
-        })
+        # Applico il filtro manualmente in Python
+        if prodotti_count > 0:
+            print(f"DEBUG: Aggiungendo categoria {nome_tradotto} con {prodotti_count} prodotti")
+            categorie.append({
+                'id': categoria_id,
+                'nome': nome_tradotto,
+                'descrizione': descrizione_tradotta,
+                'prodotti_count': prodotti_count
+            })
+        else:
+            print(f"DEBUG: Saltando categoria {nome_tradotto} con {prodotti_count} prodotti")
     
+    print(f"DEBUG: Restituendo {len(categorie)} categorie filtrate")
     conn.close()
     return jsonify(categorie)
 

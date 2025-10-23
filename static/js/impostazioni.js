@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // === CATEGORIE ===
 function caricaCategorie() {
-    fetch('/api/categorie')
+    fetch('/api/categorie', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             categorie = data.categorie;
@@ -111,6 +111,7 @@ function salvaCategoria() {
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
@@ -125,7 +126,7 @@ function salvaCategoria() {
 
 function eliminaCategoria(id) {
     if (confirm('Sei sicuro di voler eliminare questa categoria?')) {
-        fetch(`/api/categorie/${id}`, {method: 'DELETE'})
+        fetch(`/api/categorie/${id}`, {method: 'DELETE', credentials: 'include'})
             .then(response => response.json())
             .then(result => {
                 if (result.success) {
@@ -150,7 +151,7 @@ function aggiornaSelectCategorie() {
 
 // === ALLERGENI ===
 function caricaAllergeni() {
-    fetch('/api/allergeni')
+    fetch('/api/allergeni', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             allergeni = data.allergeni;
@@ -223,6 +224,7 @@ function salvaAllergene() {
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
@@ -241,7 +243,7 @@ function eliminaAllergene(id) {
     
     confirmDelete(allergene.nome, 'l\'allergene').then(confirmed => {
         if (confirmed) {
-            fetch(`/api/allergeni/${id}`, {method: 'DELETE'})
+            fetch(`/api/allergeni/${id}`, {method: 'DELETE', credentials: 'include'})
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => Promise.reject(err));
@@ -281,7 +283,7 @@ function eliminaAllergene(id) {
 
 // === INGREDIENTI ===
 function caricaIngredienti() {
-    fetch('/api/ingredienti')
+    fetch('/api/ingredienti', {credentials: 'include'})
         .then(response => response.json())
         .then(data => {
             ingredienti = data.ingredienti;
@@ -370,6 +372,7 @@ function salvaIngrediente() {
     fetch(url, {
         method: method,
         headers: {'Content-Type': 'application/json'},
+        credentials: 'include',
         body: JSON.stringify(data)
     })
     .then(response => response.json())
@@ -388,7 +391,7 @@ function eliminaIngrediente(id) {
     
     confirmDelete(ingrediente.nome, 'l\'ingrediente').then(confirmed => {
         if (confirmed) {
-            fetch(`/api/ingredienti/${id}`, {method: 'DELETE'})
+            fetch(`/api/ingredienti/${id}`, {method: 'DELETE', credentials: 'include'})
                 .then(response => {
                     if (!response.ok) {
                         return response.json().then(err => Promise.reject(err));
